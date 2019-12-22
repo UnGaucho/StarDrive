@@ -183,8 +183,7 @@ namespace Ship_Game
                 float num = Math.Abs(new Vector2(vector3_2.X, vector3_2.Y).X - vector2.X);
                 Rectangle destinationRectangle =
                     new Rectangle((int) vector2.X, (int) vector2.Y, (int) num * 2, (int) num * 2);
-                ScreenManager.SpriteBatch.Draw(uiNode, destinationRectangle, new Color(70, 255, 255, 255), 0.0f,
-                    uiNode.CenterF, SpriteEffects.None, 1f);
+                ScreenManager.SpriteBatch.Draw(uiNode, destinationRectangle, new Color(70, 255, 255, 255));
             }
         }
 
@@ -204,10 +203,9 @@ namespace Ship_Game
                         View, Matrix.Identity);
 
                     float local_6 = Math.Abs(new Vector2(local_4.X, local_4.Y).X - screenPos.X) * 2.59999990463257f;
-                    Rectangle local_7 = new Rectangle((int)screenPos.X, (int)screenPos.Y, (int)local_6, (int)local_6);
+                    var local_7 = new Rectangle((int)screenPos.X, (int)screenPos.Y, (int)local_6, (int)local_6);
 
-                    ScreenManager.SpriteBatch.Draw(uiNode, local_7, Color.White, 0.0f, uiNode.CenterF,
-                        SpriteEffects.None, 1f);
+                    ScreenManager.SpriteBatch.Draw(uiNode, local_7, Color.White);
                 }
         }
 
@@ -246,8 +244,7 @@ namespace Ship_Game
                             ProjectToScreenPosition(influ.Position.PointFromAngle(90f, influ.Radius)).X - nodePos.X);
 
                         Rectangle rect = new Rectangle((int)nodePos.X, (int)nodePos.Y, size * 5, size * 5);
-                        spriteBatch.Draw(nodeCorrected, rect, empireColor, 0.0f, nodeCorrected.CenterF,
-                            SpriteEffects.None, 1f);
+                        spriteBatch.Draw(nodeCorrected, rect, empireColor);
 
                         foreach (Empire.InfluenceNode influ2 in empire.BorderNodes)
                         {
@@ -260,7 +257,7 @@ namespace Ship_Game
                             Vector2 endPos = ProjectToScreenPosition(influ2.Position);
                             float rotation = nodePos.RadiansToTarget(endPos);
                             rect = new Rectangle((int)endPos.X, (int)endPos.Y, size * 3 / 2, (int)nodePos.Distance(endPos));
-                            spriteBatch.Draw(nodeConnect, rect, empireColor, rotation, new Vector2(2f, 2f), SpriteEffects.None, 1f);
+                            spriteBatch.Draw(nodeConnect, rect, empireColor, rotation, new Vector2(2f, 2f));
                         }
                     }
                 }
@@ -320,8 +317,7 @@ namespace Ship_Game
                         (int) (ship.Position.Y * num),
                         (int) (ship.SensorRange * num * 2.0),
                         (int) (ship.SensorRange * num * 2.0));
-                    ScreenManager.SpriteBatch.Draw(uiNode, destinationRectangle, new Color(255, 0, 0, 255), 0.0f,
-                        uiNode.CenterF, SpriteEffects.None, 1f);
+                    ScreenManager.SpriteBatch.Draw(uiNode, destinationRectangle, new Color(255, 0, 0, 255));
                 }
             }
             batch.End();
@@ -1231,7 +1227,7 @@ namespace Ship_Game
             Color textColor, SpriteFont font = null, float xOffSet = 20f, float yOffSet = 37f)
         {
             font = font ?? Fonts.Tahoma10;
-            DrawTextureRect(planetNamePointer, screenPos, pointerColor);
+            DrawTextureRect(planetNamePointer, screenPos, pointerColor, scale:0.5f);
             Vector2 posOffSet = screenPos;
             posOffSet.X += xOffSet;
             posOffSet.Y += yOffSet;

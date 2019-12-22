@@ -84,7 +84,7 @@ namespace Ship_Game.SpriteSystem
             }
             else
             {
-                batch.Draw(Tex, rect, color, Rotation, Vector2.Zero, Effects, 0.9f);
+                batch.Draw(Tex, rect, color, Rotation, Vector2.Zero, Effects);
             }
         }
     }

@@ -37,12 +37,39 @@ namespace Ship_Game
         }
 
         public static void Draw(
-            this SpriteBatch batch, SubTexture texture, in Rectangle destRect,
-            Color color, float rotation, Vector2 origin, SpriteEffects effects, float layerDepth)
+            this SpriteBatch batch, SubTexture texture, in Rectangle destRect, Color color,
+            float rotation)
         {
             CheckSubTextureDisposed(texture);
             batch.Draw(texture.Texture, destRect, texture.Rect,
-                       color, rotation, origin, effects, layerDepth);
+                color, rotation, texture.CenterF, SpriteEffects.None, 1f);
+        }
+
+        public static void Draw(
+            this SpriteBatch batch, SubTexture texture, in Rectangle destRect, Color color,
+            float rotation, Vector2 origin)
+        {
+            CheckSubTextureDisposed(texture);
+            batch.Draw(texture.Texture, destRect, texture.Rect,
+                color, rotation, origin, SpriteEffects.None, 1f);
+        }
+
+        public static void Draw(
+            this SpriteBatch batch, SubTexture texture, in Rectangle destRect, Color color,
+            float rotation, Vector2 origin, SpriteEffects effects)
+        {
+            CheckSubTextureDisposed(texture);
+            batch.Draw(texture.Texture, destRect, texture.Rect,
+                color, rotation, origin, effects, 1f);
+        }
+
+        public static void Draw(
+            this SpriteBatch batch, SubTexture texture, Vector2 position, Color color,
+            float rotation, Vector2 origin, float scale)
+        {
+            CheckSubTextureDisposed(texture);
+            batch.Draw(texture.Texture, position, texture.Rect, color,
+                rotation, origin, scale, SpriteEffects.None, 1f);
         }
 
         public static void Draw(
@@ -96,8 +123,8 @@ namespace Ship_Game
             );
         }
 
-        public static void Draw(this SpriteBatch batch, SubTexture texture, Rectangle destRect,
-                                Rectangle srcRect, Color color)
+        public static void Draw(this SpriteBatch batch, SubTexture texture, in Rectangle destRect,
+                                in Rectangle srcRect, Color color)
         {
             CheckSubTextureDisposed(texture);
             Rectangle adjustedSrcRect = AdjustedToSubTexture(texture, srcRect);
@@ -105,7 +132,7 @@ namespace Ship_Game
         }
 
         public static void Draw(
-            this SpriteBatch batch, SubTexture texture, Rectangle destRect, Rectangle srcRect,
+            this SpriteBatch batch, SubTexture texture, in Rectangle destRect, in Rectangle srcRect,
             Color color, float rotation, Vector2 origin, SpriteEffects effects, float layerDepth)
         {
             CheckSubTextureDisposed(texture);

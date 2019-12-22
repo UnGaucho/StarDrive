@@ -171,8 +171,7 @@ namespace Ship_Game
                 Vector2 insetRadialSS = new Vector2(insetRadialPos.X, insetRadialPos.Y);
                 float ssRadius = Math.Abs(insetRadialSS.X - screenPos.X);
                 Rectangle nodeRect = new Rectangle((int)screenPos.X, (int)screenPos.Y, (int)ssRadius * 2, (int)ssRadius * 2);
-                Vector2 origin = new Vector2(nodeTexture.Width / 2f, nodeTexture.Height / 2f);
-                batch.Draw(nodeTexture, nodeRect, new Color(0, 255, 0, 75), 0f, origin, SpriteEffects.None, 1f);
+                batch.Draw(nodeTexture, nodeRect, new Color(0, 255, 0, 75));
             }
             ClickableNodes.Clear();
             foreach (FleetDataNode node in SelectedFleet.DataNodes)
@@ -514,7 +513,7 @@ namespace Ship_Game
                 }
                 float single = Mouse.GetState().X;
                 MouseState state = Mouse.GetState();
-                batch.Draw(item, new Vector2(single, state.Y), EmpireManager.Player.EmpireColor, 0f, iconOrigin, scale, SpriteEffects.None, 1f);
+                batch.Draw(item, new Vector2(single, state.Y), EmpireManager.Player.EmpireColor, 0f, iconOrigin, scale);
             }
             DrawSelectedData(StarDriveGame.Instance.GameTime);
             Close.Draw(batch);

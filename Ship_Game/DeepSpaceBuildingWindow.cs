@@ -188,7 +188,7 @@ namespace Ship_Game
                         batch.DrawString(Fonts.Arial20Bold, string.Concat("Will Orbit ", p.planetToClick.Name), new Vector2(mousePos.X, mousePos.Y + 34f), Color.White);
                     }
                 }
-                batch.Draw(platform, mousePos, new Color(0, 255, 0, 100), 0f, IconOrigin, scale, SpriteEffects.None, 1f);
+                batch.Draw(platform, mousePos, new Color(0, 255, 0, 100), 0f, IconOrigin, scale);
             }
         }
 

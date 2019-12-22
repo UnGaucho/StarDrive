@@ -186,7 +186,7 @@ namespace Ship_Game
         {
             if (!animated)
             {
-                spriteBatch.Draw(TextureDefault, drawRect, Color.White, 0f, Vector2.Zero, SpriteEffects.FlipHorizontally, 1f);
+                spriteBatch.Draw(TextureDefault, drawRect, Color.White, 0f, Vector2.Zero, SpriteEffects.FlipHorizontally);
                 return;
             }
             if (Idle)

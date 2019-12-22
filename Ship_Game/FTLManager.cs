@@ -109,8 +109,7 @@ namespace Ship_Game
                     color = color.MultiplyRgb(colorMul);
                 }
 
-                batch.Draw(FTL.Tex, pos, color, Rotation,
-                           FTL.Tex.CenterF, sizeScaleOnScreen, SpriteEffects.None, 0.9f);
+                batch.Draw(FTL.Tex, pos, color, Rotation, FTL.Tex.CenterF, sizeScaleOnScreen);
             }
         }
 

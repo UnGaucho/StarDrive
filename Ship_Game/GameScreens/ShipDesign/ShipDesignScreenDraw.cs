@@ -152,7 +152,7 @@ namespace Ship_Game
                     break;
                 }
             }
-            spriteBatch.Draw(texture, r, Color.White.Alpha(alpha), rotation, Vector2.Zero, effects, 1f);
+            spriteBatch.Draw(texture, r, Color.White.Alpha(alpha), rotation, Vector2.Zero, effects);
         }
 
         void DrawTacticalOverlays(SpriteBatch batch)
@@ -217,7 +217,7 @@ namespace Ship_Game
                     || slot.Module.ModuleType == ShipModuleType.PowerConduit)
                         continue;
                 spriteBatch.Draw(ResourceManager.Texture("UI/lightningBolt"),
-                    slot.Center, Color.White, 0f, lightOrigin, 1f, SpriteEffects.None, 1f);
+                    slot.Center, Color.White, 0f, lightOrigin, 1f);
             }
         }
 
@@ -251,7 +251,7 @@ namespace Ship_Game
             Rectangle rect = posOnScreen.ToRect((int)sizeOnScreen, (int)sizeOnScreen);
 
             float radians = (shipFacing + m.FacingRadians);
-            batch.Draw(arcTexture, rect, color.Alpha(0.75f), radians, texOrigin, SpriteEffects.None, 1f);
+            batch.Draw(arcTexture, rect, color.Alpha(0.75f), radians, texOrigin);
 
             Vector2 direction = radians.RadiansToDirection();
             Vector2 start     = posOnScreen;

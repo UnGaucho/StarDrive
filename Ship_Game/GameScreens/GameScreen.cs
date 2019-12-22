@@ -261,24 +261,20 @@ namespace Ship_Game
         // just draws a texture to screen, no fancy reprojections, where screenPos is the texture CENTER
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void DrawTexture(SubTexture texture, Vector2 posOnScreen, float scale, float rotation, Color color)
-            => ScreenManager.SpriteBatch.Draw(texture, posOnScreen, color, rotation, texture.CenterF, scale, SpriteEffects.None, 1f);
+            => ScreenManager.SpriteBatch.Draw(texture, posOnScreen, color, rotation, texture.CenterF, scale);
 
         // just draws a texture to screen, no fancy reprojections, where screenPos is the texture CENTER
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void DrawTextureSized(SubTexture texture, Vector2 posOnScreen, float rotation, float width, float height, Color color)
         {
             var rect = new Rectangle((int)posOnScreen.X, (int)posOnScreen.Y, (int)width, (int)height);
-            ScreenManager.SpriteBatch.Draw(texture, rect, color, rotation, texture.CenterF, SpriteEffects.None, 1f);
+            ScreenManager.SpriteBatch.Draw(texture, rect, color, rotation);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void DrawTextureRect(SubTexture texture, Vector2 posOnScreen, Color color, float rotation = 0f)
-            => DrawTextureRect(texture, posOnScreen, color, rotation, Vector2.Zero);
-
         // just draws a texture to screen, no fancy reprojections, where screenPos is the texture top left.
-        public void DrawTextureRect(SubTexture texture, Vector2 posOnScreen, Color color, float rotation , Vector2 origin )
+        public void DrawTextureRect(SubTexture texture, Vector2 posOnScreen, Color color, float scale)
         {
-            ScreenManager.SpriteBatch.Draw(texture, posOnScreen, color, rotation, Vector2.Zero, 0.5f, SpriteEffects.None, 1f);
+            ScreenManager.SpriteBatch.Draw(texture, posOnScreen, color, 0f, Vector2.Zero, scale);
         }
 
         public void CheckToolTip(int toolTipId, Rectangle rectangle, Vector2 mousePos)

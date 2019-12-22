@@ -241,7 +241,7 @@ namespace Ship_Game
                 r.Width = (int) (screen * (tex.Width / (float) tex.Height));
             }
 
-            batch.Draw(tex, r, new Color(1f, 1f, 1f, a), e.Rotation, tex.CenterF, SpriteEffects.None, 1f);
+            batch.Draw(tex, r, new Color(1f, 1f, 1f, a), e.Rotation);
         }
     }
 }

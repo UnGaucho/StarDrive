@@ -85,7 +85,7 @@ namespace Ship_Game
                 Color drawColor = (i == HoveredIndex) ? Color.Red : Color.White;
 
                 spriteBatch.Draw(RootNode.Children[i].Icon, imagePos, drawColor, 0f, 
-                        RootNode.Children[i].Icon.CenterF, scale, SpriteEffects.None, 1f);
+                        RootNode.Children[i].Icon.CenterF, scale);
 
                 if (i == HoveredIndex)
                 {

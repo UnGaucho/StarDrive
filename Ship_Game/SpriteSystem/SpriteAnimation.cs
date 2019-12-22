@@ -144,7 +144,7 @@ namespace Ship_Game
         {
             if (!IsVisible) return;
             SubTexture frame = Atlas[CurrentFrameId];
-            sb.Draw(frame, r, c, rot, Vector2.Zero, e, 0.9f);
+            sb.Draw(frame, r, c, rot, Vector2.Zero, e);
         }
     }
 }

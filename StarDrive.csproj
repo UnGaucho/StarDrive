@@ -169,6 +169,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GlobalSuppressions.cs" />
+    <Compile Include="Graphics\FColor.cs" />
+    <Compile Include="Graphics\FVector2.cs" />
+    <Compile Include="Graphics\Graphics.cs" />
+    <Compile Include="Graphics\XnaGraphics.cs" />
     <Compile Include="Ship_Game\AI\CombatTactics\Evade.cs" />
     <Compile Include="Ship_Game\AI\CombatTactics\HoldPosition.cs" />
     <Compile Include="Ship_Game\AI\CombatTactics\BroadSides.cs" />

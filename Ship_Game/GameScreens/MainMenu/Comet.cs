@@ -55,7 +55,7 @@ namespace Ship_Game.GameScreens.MainMenu
                 alpha = (25500f / Pos.Y).Clamped(0f, 255f);
                 
             var c = new Color(Color.White, (byte)alpha);
-            batch.Draw(Texture, Pos, c, Rotation, Texture.CenterF, 0.45f, SpriteEffects.None, 1f);
+            batch.Draw(Texture, Pos, c, Rotation, Texture.CenterF, 0.45f);
 
         }
     }

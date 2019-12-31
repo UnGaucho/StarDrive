@@ -351,11 +351,12 @@ namespace Ship_Game
             return null;
         }
 
-        public int GetUnusedKeyForFleet()
+        public int CreateFleetKey()
         {
-            int key = 0;
-            while (FleetsDict.ContainsKey(key))
+            int key = 1;
+            while (EmpireAI.UsedFleets.Contains(key))
                 ++key;
+            EmpireAI.UsedFleets.Add(key);
             return key;
         }
 
@@ -580,6 +581,12 @@ namespace Ship_Game
             return solarSystems.ToArray();
         }
 
+        public void RemovePlanet(Planet planet, Empire attacker)
+        {
+            GetRelations(attacker).LostAColony(planet, attacker);
+            RemovePlanet(planet);
+        }
+
         public void RemovePlanet(Planet planet)
         {
             OwnedPlanets.Remove(planet);
@@ -591,6 +598,12 @@ namespace Ship_Game
         {
             OwnedPlanets.Clear();
             OwnedSolarSystems.Clear();
+        }
+
+        public void AddPlanet(Planet planet, Empire loser)
+        {
+            GetRelations(loser).WonAColony(planet, loser);
+            AddPlanet(planet);
         }
 
         public void AddPlanet(Planet planet)
@@ -1372,9 +1385,10 @@ namespace Ship_Game
             FleetUpdateTimer -= elapsedTime;
             foreach (var kv in FleetsDict)
             {
-                kv.Value.Update(elapsedTime);
+                Fleet fleet = kv.Value;
+                fleet.Update(elapsedTime);
                 if (FleetUpdateTimer <= 0f)
-                    kv.Value.UpdateAI(elapsedTime, kv.Key);
+                    fleet.UpdateAI(elapsedTime, kv.Key);
             }
             if (FleetUpdateTimer < 0.0)
                 FleetUpdateTimer = 5f;
@@ -1959,8 +1973,7 @@ namespace Ship_Game
                     //loop over all ALLIED projectors
                     InfluenceNode influenceNode = SensorNodes.RecycleObject() ?? new InfluenceNode();
                     influenceNode.Position = ship.Center;
-                    influenceNode.Radius =
-                        ProjectorRadius; //projectors currently use their projection radius as sensors
+                    influenceNode.Radius = ProjectorRadius; //projectors currently use their projection radius as sensors
                     SensorNodes.Add(influenceNode);
                     influenceNode.SourceObject = ship;
                     influenceNode.Known = wellKnown;
@@ -2022,7 +2035,7 @@ namespace Ship_Game
             }
             if (isPlayer)
             {
-                if (Universe.StarDate > 1060.0f)
+                if (Universe.StarDate > 1005.0f)
                 {
                     float aiTotalScore = 0.0f;
                     float score = 0.0f;
@@ -2075,7 +2088,7 @@ namespace Ship_Game
                 }
 
                 RandomEventManager.UpdateEvents();
-                if (data.TurnsBelowZero == 5 && Money < 0.0)
+                if (data.TurnsBelowZero > 3 && Money < 0.0)
                     Universe.NotificationManager.AddMoneyWarning();
 
                 if (!Universe.NoEliminationVictory)
@@ -2151,7 +2164,7 @@ namespace Ship_Game
 
         void Bankruptcy()
         {
-            if (data.TurnsBelowZero >= 25)
+            if (data.TurnsBelowZero >= RandomMath.RollDie(8))
             {
                 Log.Info($"Rebellion for: {data.Traits.Name}");
 
@@ -2167,14 +2180,29 @@ namespace Ship_Game
                         if (isPlayer)
                             Universe.NotificationManager.AddRebellionNotification(planet,
                                 rebels);
+
                         for (int index = 0; index < planet.PopulationBillion; ++index)
                         {
                             Troop troop = EmpireManager.CreateRebelTroop(rebels);
-                            if (planet.FreeTiles == 0 && !planet.BumpOutTroop(EmpireManager.Corsairs)
-                                                      && !troop.TryLandTroop(planet)) // Let's say the rebels are pirates :)
+
+                            var chance = (planet.TileArea - planet.FreeTiles) / planet.TileArea;
+                            
+                            if (RandomMath.RollDiceAvg(chance * 50))
                             {
-                                troop.Launch(planet); // launch the rebels
+                                var t = RandomMath.RandItem(planet.TroopsHere);
+                                if (t != null)
+                                    troop.ChangeLoyalty(rebels);
                             }
+
+                            if (RandomMath.RollDiceAvg(chance * 50))
+                            {
+                                var building = RandomMath.RandItem(planet.BuildingList
+                                                                   .Filter(b=> !b.IsBiospheres));
+                                if (building != null)
+                                    planet.ScrapBuilding(building);
+                            }
+
+                            troop.TryLandTroop(planet);
                         }
                     }
 
@@ -2371,23 +2399,6 @@ namespace Ship_Game
                     // added by gremlin Do not include 0 strength ships in defensive force pool
                     s.AI.ClearOrders();
                 }
-
-                if (IsCybernetic)
-                {
-                    foreach (Planet planet in OwnedPlanets)
-                    {
-                        Array<Building> list = new Array<Building>();
-                        foreach (Building building in planet.BuildingList)
-                        {
-                            if (building.PlusFlatFoodAmount > 0.0 || building.PlusFoodPerColonist > 0.0 ||
-                                building.PlusTerraformPoints > 0.0)
-                                list.Add(building);
-                        }
-
-                        foreach (Building b in list)
-                            planet.ScrapBuilding(b);
-                    }
-                }
             }
 
             foreach (Agent agent in target.data.AgentList)
@@ -2573,6 +2584,12 @@ namespace Ship_Game
 
         public void RemoveShip(Ship ship)
         {
+            if (ship == null)
+            {
+                Log.Error($"Empire '{Name}' RemoveShip failed: ship was null");
+                return;
+            }
+
             if (ship.IsSubspaceProjector)
                 OwnedProjectors.RemoveRef(ship);
             else
@@ -2582,6 +2599,17 @@ namespace Ship_Game
 
             ship.AI.ClearOrders();
             ship.ClearFleet();
+        }
+
+        public void RemoveShipFromAOs(Ship ship)
+        {
+            Array<AO> aos = GetEmpireAI().AreasOfOperations;
+            for (int x = 0; x < aos.Count; x++)
+            {
+                var ao = aos[x];
+                if (ao.RemoveShip(ship))
+                    break;
+            }
         }
 
         public bool IsEmpireAttackable(Empire targetEmpire, GameplayObject target = null)
@@ -2688,13 +2716,13 @@ namespace Ship_Game
 
         public void Dispose()
         {
-            Dispose(true);
+            Destroy();
             GC.SuppressFinalize(this);
         }
 
-        ~Empire() { Dispose(false); }
+        ~Empire() { Destroy(); }
 
-        void Dispose(bool disposing)
+        void Destroy()
         {
             ForcePool = null;
             BorderNodes?.Dispose(ref BorderNodes);

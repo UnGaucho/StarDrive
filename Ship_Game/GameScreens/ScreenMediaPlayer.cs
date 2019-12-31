@@ -28,7 +28,7 @@ namespace Ship_Game.GameScreens
 
         // Extra music associated with the video.
         // For example, diplomacy screen uses WAR music if WarDeclared
-        AudioHandle Music = AudioHandle.Dummy;
+        AudioHandle Music = AudioHandle.DoNotPlay;
 
         // If TRUE, the video becomes interactive with a Play button
         public bool EnableInteraction = false;
@@ -114,7 +114,8 @@ namespace Ship_Game.GameScreens
 
         public bool IsPlaying => Video != null && Player.State == MediaState.Playing;
         public bool IsPaused  => Video != null && Player.State == MediaState.Paused;
-        public bool IsStopped => Video == null || Player.State == MediaState.Stopped;
+        public bool IsStopped => Video == null || Player.IsDisposed ||
+                                                  Player.State == MediaState.Stopped;
 
         public void Stop()
         {

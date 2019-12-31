@@ -179,6 +179,7 @@
     <Compile Include="Ship_Game\AI\CombatTactics\OrbitTarget.cs" />
     <Compile Include="Ship_Game\AI\CombatTactics\Artillery.cs" />
     <Compile Include="Ship_Game\AI\EmpireAI\Budget.cs" />
+    <Compile Include="Ship_Game\AI\StrategyAI\FleetShips.cs" />
     <Compile Include="Ship_Game\AI\EmpireAI\ShipBuilder.cs" />
     <Compile Include="Ship_Game\AI\EmpireAI\EmpireAI.DiplomacyAnger.cs" />
     <Compile Include="Ship_Game\AI\EmpireAI\EmpireAI.DiplomacyOffers.cs" />
@@ -193,8 +194,8 @@
     <Compile Include="Ship_Game\AI\EmpireAI\EmpireAI.RunResearchPlanner.cs" />
     <Compile Include="Ship_Game\AI\EmpireAI\EmpireAI.RunWarPlanner.cs" />
     <Compile Include="Ship_Game\AI\EmpireAI\EmpireRiskAssessment.cs" />
-    <Compile Include="Ship_Game\AI\EmpireAI\FleetRatios.cs" />
-    <Compile Include="Ship_Game\AI\Fleet.FleetGoal.cs" />
+    <Compile Include="Ship_Game\AI\StrategyAI\FleetRatios.cs" />
+    <Compile Include="Ship_Game\AI\StrategyAI\Fleet.FleetGoal.cs" />
     <Compile Include="Ship_Game\AI\CombatTactics\AssaultShipCombat.cs" />
     <Compile Include="Ship_Game\AI\CombatTactics\ShipAI.AttackRun.cs" />
     <Compile Include="Ship_Game\AI\Research\ChooseTech.cs" />
@@ -219,6 +220,7 @@
     </Compile>
     <Compile Include="Ship_Game\Commands\Goals\BuildShipsGoalBase.cs" />
     <Compile Include="Ship_Game\Commands\Goals\BuildOrbital.cs" />
+    <Compile Include="Ship_Game\Debug\Page\DebugWar.cs" />
     <Compile Include="Ship_Game\EmpireResearch.cs" />
     <Compile Include="Ship_Game\Empire_Trade.cs" />
     <Compile Include="Ship_Game\Commands\Goals\BuildConstructionShip.cs" />
@@ -331,6 +333,7 @@
     <Compile Include="Ship_Game\Ships\AI\WayPoints.cs" />
     <Compile Include="Ship_Game\Ships\CarrierBays.cs" />
     <Compile Include="Ship_Game\Ships\Ship_ProjectorInfluence.cs" />
+    <Compile Include="Ship_Game\Ships\Ship_Warp.cs" />
     <Compile Include="Ship_Game\Ships\SupplyShuttles.cs" />
     <Compile Include="Ship_Game\Ships\Ship_Trade.cs" />
     <Compile Include="Ship_Game\Ships\IShipTemplate.cs" />
@@ -357,7 +360,6 @@
     <Compile Include="Ship_Game\GameScreens\LoadSaveItems\LoadSetupScreen.cs" />
     <Compile Include="Ship_Game\RaceSave.cs" />
     <Compile Include="Ship_Game\GameScreens\LoadSaveItems\SaveRaceScreen.cs" />
-    <Compile Include="Ship_Game\ExceptionTracker.cs" />
     <Compile Include="Ship_Game\ExceptionViewer.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -399,6 +401,7 @@
     <Compile Include="Ship_Game\Universe\SolarBodies\GeodeticManager.cs" />
     <Compile Include="Ship_Game\Universe\SolarBodies\ColonyResource.cs" />
     <Compile Include="Ship_Game\Universe\SolarBodies\ColonyStorage.cs" />
+    <Compile Include="Ship_Game\Universe\SolarBodies\Planet\Planet_BuildOrbitals.cs" />
     <Compile Include="Ship_Game\Universe\SolarBodies\Planet\Planet_Colonize.cs" />
     <Compile Include="Ship_Game\Universe\SolarBodies\Planet\Planet_Trade.cs" />
     <Compile Include="Ship_Game\Universe\SolarBodies\Planet\SunZoneData.cs">
@@ -426,6 +429,8 @@
     <Compile Include="Ship_Game\GameScreens\DeveloperSandbox.cs" />
     <Compile Include="Ship_Game\Universe\SolarBodies\SolarSystemBody.cs" />
     <Compile Include="Ship_Game\Universe\SolarBodies\Explorable.cs" />
+    <Compile Include="Ship_Game\Universe\UniverseScreen\ShipGroupProject.cs" />
+    <Compile Include="Ship_Game\Universe\UniverseScreen\ShipMoveCommands.cs" />
     <Compile Include="Ship_Game\Universe\UniverseScreen\UniverseScreen.Camera.cs" />
     <Compile Include="Ship_Game\Universe\UniverseScreen\UniverseScreen.Draw.cs" />
     <Compile Include="Ship_Game\Universe\UniverseScreen\UniverseScreen.HandleInput.cs" />
@@ -1044,11 +1049,11 @@
       <AutoGen>false</AutoGen>
       <DesignTimeSharedInput>false</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="Ship_Game\WarType.cs">
+    <Compile Include="Ship_Game\AI\StrategyAI\WarType.cs">
       <AutoGen>false</AutoGen>
       <DesignTimeSharedInput>false</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="Ship_Game\WarState.cs">
+    <Compile Include="Ship_Game\AI\StrategyAI\WarState.cs">
       <AutoGen>false</AutoGen>
       <DesignTimeSharedInput>false</DesignTimeSharedInput>
     </Compile>
@@ -1076,7 +1081,7 @@
       <AutoGen>false</AutoGen>
       <DesignTimeSharedInput>false</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="Ship_Game\War.cs">
+    <Compile Include="Ship_Game\AI\StrategyAI\War.cs">
       <AutoGen>false</AutoGen>
       <DesignTimeSharedInput>false</DesignTimeSharedInput>
     </Compile>

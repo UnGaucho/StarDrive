@@ -29,6 +29,7 @@ namespace Ship_Game.Debug
         input,
         Tech,
         Solar, // Sun timers, black hole data, pulsar radiation radius...
+        RelationsWar,
         Last // dummy value
     }
 
@@ -165,6 +166,7 @@ namespace Ship_Game.Debug
                     case DebugModes.Trade:   Page = Add(new TradeDebug(Screen, this)); break;
                     case DebugModes.Planets: Page = Add(new PlanetDebug(Screen,this)); break;
                     case DebugModes.Solar:   Page = Add(new SolarDebug(Screen, this)); break;
+                    case DebugModes.RelationsWar: Page = Add(new DebugWar(Screen, this)); break;
                 }
             }
 
@@ -182,7 +184,7 @@ namespace Ship_Game.Debug
             if (Screen.SelectedShip != null)
             {
                 Ship ship = Screen.SelectedShip;
-                ship.Speed = speedLimiter * ship.velocityMaximum;
+                ship.SpeedLimit = speedLimiter * ship.VelocityMaximum;
             }
 
             foreach (PredictionDebugPlatform platform in GetPredictionDebugPlatforms())
@@ -311,7 +313,7 @@ namespace Ship_Game.Debug
                     Screen.DrawCircleProjected(module.Center, 8f, 6, Color.MediumVioletRed);
                     if (weapon.DebugLastImpactPredict.NotZero())
                     {
-                        weapon.ProjectedImpactPointNoError(module, out Vector2 impactNoError);
+                        Vector2 impactNoError = weapon.ProjectedImpactPointNoError(module);
                         Screen.DrawLineProjected(weapon.Origin, weapon.DebugLastImpactPredict, Color.Yellow);
 
                         Screen.DrawCircleProjected(impactNoError, 22f, 10, Color.BlueViolet, 2f);
@@ -385,7 +387,7 @@ namespace Ship_Game.Debug
             if (Screen.SelectedFleet != null)
             {
                 Fleet fleet = Screen.SelectedFleet;
-                DrawArrowImm(fleet.Position, fleet.Position+fleet.Direction*200f, Color.OrangeRed);
+                DrawArrowImm(fleet.FinalPosition, fleet.FinalPosition+fleet.FinalDirection*200f, Color.OrangeRed);
                 foreach (Ship ship in fleet.Ships)
                     VisualizeShipGoal(ship, false);
 
@@ -405,8 +407,8 @@ namespace Ship_Game.Debug
                     DrawString(fleet.Name);
                     DrawString("Ships: " + fleet.Ships.Count);
                     DrawString("Strength: " + fleet.GetStrength());
-                    DrawString("FleetSpeed: " + fleet.Speed);
-                    DrawString("Distance: " + fleet.Position.Distance(fleet.AveragePosition()));
+                    DrawString("FleetSpeed: " + fleet.SpeedLimit);
+                    DrawString("Distance: " + fleet.FinalPosition.Distance(fleet.AveragePosition()));
 
                     string shipAI = fleet.Ships?.FirstOrDefault()?.AI.State.ToString() ?? "";
                     DrawString("Ship State: " + shipAI);
@@ -417,15 +419,15 @@ namespace Ship_Game.Debug
             else if (Screen.CurrentGroup != null)
             {
                 ShipGroup group = Screen.CurrentGroup;
-                DrawArrowImm(group.Position, group.Position+group.Direction*200f, Color.OrangeRed);
+                DrawArrowImm(group.FinalPosition, group.FinalPosition+group.FinalDirection*200f, Color.OrangeRed);
                 foreach (Ship ship in group.Ships)
                     VisualizeShipGoal(ship, false);
 
-                DrawString($"ShipGroup ({group.CountShips})  x {(int)group.Position.X} y {(int)group.Position.Y}");
+                DrawString($"ShipGroup ({group.CountShips})  x {(int)group.FinalPosition.X} y {(int)group.FinalPosition.Y}");
 
-                if (group.GoalMovePosition.NotZero())
+                if (group.HasFleetGoal)
                 {
-                    DrawLineImm(group.Position, group.GoalMovePosition, Color.YellowGreen);
+                    DrawLineImm(group.FinalPosition, group.NextGoalMovePosition, Color.YellowGreen);
                 }
             }
             else if (Screen.SelectedShip != null)
@@ -433,15 +435,15 @@ namespace Ship_Game.Debug
                 Ship ship = Screen.SelectedShip;
 
                 DrawString($"Ship {ship.ShipName}  x {(int)ship.Center.X} y {(int)ship.Center.Y}");
-                DrawString($"Ship velocity: {(int)ship.Velocity.Length()}  speedLimit: {(int)ship.Speed}  {ship.WarpState}");
+                DrawString($"Ship velocity: {(int)ship.Velocity.Length()}  speedLimit: {(int)ship.SpeedLimit}  {ship.WarpState}");
                 VisualizeShipOrderQueue(ship);
                 DrawWeaponArcs(ship);
 
                 DrawString($"On Defense: {ship.DoingSystemDefense}");
                 if (ship.fleet != null)
                 {
-                    DrawString($"Fleet {ship.fleet.Name}  {(int)ship.fleet.Position.X}x{(int)ship.fleet.Position.Y}");
-                    DrawString($"Fleet speed: {ship.fleet.Speed}");
+                    DrawString($"Fleet {ship.fleet.Name}  {(int)ship.fleet.FinalPosition.X}x{(int)ship.fleet.FinalPosition.Y}");
+                    DrawString($"Fleet speed: {ship.fleet.SpeedLimit}");
                 }
 
                 DrawString(!ship.loyalty.ForcePoolContains(ship) ? "NOT In Force Pool" : "In Force Pool");
@@ -457,7 +459,9 @@ namespace Ship_Game.Debug
                 DrawString("Influences: " + string.Join(",", influence));
                 DrawString("InfluenceType: " + (ship.IsInFriendlyProjectorRange ? "Friendly"
                                              :  ship.IsInHostileProjectorRange  ? "Hostile" : "Neutral"));
-                DrawString($"GravityWell: {ship?.System?.IdentifyGravityWell(ship)?.Name}   Inhibited:{ship.IsInhibitedByUnfriendlyGravityWell}");
+
+                string gravityWell = Empire.Universe.GravityWells ? ship?.System?.IdentifyGravityWell(ship)?.Name : "disabled";
+                DrawString($"GravityWell: {gravityWell}   Inhibited:{ship.IsInhibitedByUnfriendlyGravityWell}");
 
                 DrawString(ship.InCombat ? Color.Green : Color.LightPink,
                            ship.InCombat ? ship.AI.BadGuysNear ? "InCombat" : "ERROR" : "Not in Combat");
@@ -478,7 +482,7 @@ namespace Ship_Game.Debug
                     DrawString(shipTarget.Active ? "Active" : "Error - Active");
                 }
                 DrawString($"Strength: {ship.BaseStrength}");
-                DrawString($"VelocityMax: {ship.velocityMaximum}  FTLMax: {ship.MaxFTLSpeed}");
+                DrawString($"VelocityMax: {ship.VelocityMaximum}  FTLMax: {ship.MaxFTLSpeed}");
                 DrawString($"HP: {ship.Health} / {ship.HealthMax}");
                 DrawString("Ship Mass: " + ship.Mass);
                 DrawString("EMP Damage: " + ship.EMPDamage + " / " + ship.EmpTolerance + " :Recovery: " + ship.EmpRecovery);

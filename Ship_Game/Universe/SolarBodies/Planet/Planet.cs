@@ -71,6 +71,15 @@ namespace Ship_Game
 
         public int CountEmpireTroops(Empire us) => TroopManager.NumEmpireTroops(us);
         public int GetDefendingTroopCount()     => TroopManager.NumDefendingTroopCount;
+
+        public float GetDefendingTroopStrength()  => TroopManager.OwnerTroopStrength;
+
+        public int GetEstimatedTroopStrengthToInvade(int bestTroopStrength = 10)
+        {
+            float strength = TroopManager.GroundStrength(Owner); //.ClampMin(100);
+            return strength > 0 ? (int)Math.Ceiling(strength / bestTroopStrength.ClampMin(1)) : 0;
+
+        }
         public bool AnyOfOurTroops(Empire us)   => TroopManager.WeHaveTroopsHere(us);
         public int GetGroundLandingSpots()      => TroopManager.NumGroundLandingSpots();
 
@@ -82,12 +91,17 @@ namespace Ship_Game
         public bool ForeignTroopHere(Empire empire)      => TroopManager.ForeignTroopHere(empire);
 
 
-        public float GetGroundStrengthOther(Empire allButThisEmpire)      => TroopManager.GroundStrengthOther(allButThisEmpire);
-        public Array<Troop> GetEmpireTroops(Empire empire, int maxToTake) => TroopManager.EmpireTroops(empire, maxToTake);
+        public float GetGroundStrengthOther(Empire allButThisEmpire)
+            => TroopManager.GroundStrengthOther(allButThisEmpire);
+        public Array<Troop> GetEmpireTroops(Empire empire, int maxToTake) 
+            => TroopManager.EmpireTroops(empire, maxToTake);
+        public Troop[] GetOwnersLaunchReadyTroops(float strengthNeeded)   
+            => TroopManager.TroopsReadForLaunch(strengthNeeded);
 
         public bool NoGovernorAndNotTradeHub             => colonyType != ColonyType.Colony && colonyType != ColonyType.TradeHub;
 
         public float Fertility                      => FertilityFor(Owner);
+        public float MaxFertility                   => MaxFertilityFor(Owner);
         public float FertilityFor(Empire empire)    => BaseFertility * empire?.RacialEnvModifer(Category) ?? BaseFertility;
         public float MaxFertilityFor(Empire empire) => BaseMaxFertility * empire?.RacialEnvModifer(Category) ?? BaseMaxFertility;
 
@@ -275,7 +289,7 @@ namespace Ship_Game
         // added by gremlin deveks drop bomb
         public void DropBomb(Bomb bomb) => GeodeticManager.DropBomb(bomb);
 
-        public void ApplyBombEnvEffects(float amount) // added by Fat Bastard
+        public void ApplyBombEnvEffects(float amount, Empire attacker) // added by Fat Bastard
         {
             Population -= 1000f * amount;
             AddBaseFertility(amount * -0.25f); // environment suffers temp damage
@@ -283,7 +297,7 @@ namespace Ship_Game
                 AddMaxBaseFertility(-0.02f); // permanent damage to Max Fertility
 
             if (MaxPopulation.AlmostZero())
-                WipeOutColony();
+                WipeOutColony(attacker);
         }
 
         public void Update(float elapsedTime)
@@ -401,7 +415,7 @@ namespace Ship_Game
             else
             {
                 defenseShip.Level = 3;
-                defenseShip.Velocity = UniverseRandom.RandomDirection() * defenseShip.Speed;
+                defenseShip.Velocity = UniverseRandom.RandomDirection() * defenseShip.SpeedLimit;
                 empire.AddMoney(-defenseShip.GetCost(Owner) / 10);
             }
         }
@@ -876,14 +890,14 @@ namespace Ship_Game
             Population = Math.Max(10, Population); // over population will decrease in time, so this is not clamped to max pop
         }
 
-        public void WipeOutColony()
+        public void WipeOutColony(Empire attacker)
         {
             Population = 0f;
             if (Owner == null)
                 return;
 
             UpdateTerraformPoints(0);
-            Owner.RemovePlanet(this);
+            Owner.RemovePlanet(this, attacker);
             if (IsExploredBy(Empire.Universe.PlayerEmpire))
                 Empire.Universe.NotificationManager.AddPlanetDiedNotification(this, Empire.Universe.PlayerEmpire);
 
@@ -924,18 +938,38 @@ namespace Ship_Game
             return randomEnemyTroop.Launch() != null;
         }
 
-        public int TotalInvadeInjure   => BuildingList.Sum(b => b.InvadeInjurePoints);
-        public float TotalSpaceOffense => BuildingList.Sum(b => b.Offense) + OrbitalStations.Values.Sum(o => o.BaseStrength);
-        public int MaxDefenseShips     => BuildingList.Sum(b => b.DefenseShipsCapacity);
-        public int CurrentDefenseShips => BuildingList.Sum(b => b.CurrentNumDefenseShips) + ParentSystem.ShipList.Count(s => s?.HomePlanet == this);
+        public int TotalInvadeInjure         => BuildingList.Sum(b => b.InvadeInjurePoints);
+        public float BuildingGeodeticOffense => BuildingList.Sum(b => b.Offense);
+        public int BuildingGeodeticCount     => BuildingList.Count(b => b.Offense > 0);
+        public float TotalGeodeticOffense    => BuildingGeodeticOffense + OrbitalStations.Values.Sum(o => o.BaseStrength);
+        public int MaxDefenseShips           => BuildingList.Sum(b => b.DefenseShipsCapacity);
+        public int CurrentDefenseShips       => BuildingList.Sum(b => b.CurrentNumDefenseShips) + ParentSystem.ShipList.Count(s => s?.HomePlanet == this);
 
         public int AvailableTiles      => TilesList.Count(tile => tile.Habitable && tile.NoBuildingOnTile);
         public int TotalBuildings      => TilesList.Count(tile => tile.building != null && !tile.building.IsBiospheres);
         public float BuiltCoverage     => TotalBuildings / (float)TileArea;
+        public bool TerraformingHere   => BuildingList.Any(b => b.IsTerraformer);
 
         public int ExistingMilitaryBuildings  => BuildingList.Count(b => b.IsMilitary);
-        public float TerraformTargetFertility => BuildingList.Sum(b => b.MaxFertilityOnBuild) + 1 / (Owner?.RacialEnvModifer(Owner.data.PreferredEnv) ?? 1);
-        public bool TerraformingHere          => BuildingList.Any(b => b.IsTerraformer);
+
+        // FB - This will give the Max Fertility the planet should have after terraforming is complete
+        public float TerraformMaxFertilityTarget
+        {
+            get
+            {
+                float sumPositiveFertilityChange = 1;
+
+                for (int i = 0; i < BuildingList.Count; i++)
+                {
+                    Building b = BuildingList[i];
+                    if (b.MaxFertilityOnBuild > 0)
+                        sumPositiveFertilityChange += b.MaxFertilityOnBuild;
+                }
+
+                float racialEnvDivider = 1 / Owner?.RacialEnvModifer(Owner.data.PreferredEnv) ?? 1;
+                return racialEnvDivider + sumPositiveFertilityChange;
+            }
+        }
 
         public int DesiredMilitaryBuildings
         {

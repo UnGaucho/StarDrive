@@ -2356,7 +2356,9 @@ namespace Ship_Game
 
             if (Money < 0.0 && !isFaction)
             {
-                data.TurnsBelowZero += (short)(1 + -1 * (Money) / 500);
+                float maintenance    = (TotalBuildingMaintenance + TotalShipMaintenance - TotalMaintenanceInScrap).LowerBound(1);
+                float ratio          = Money / maintenance;
+                data.TurnsBelowZero += (short)(-1 * ratio);
             }
             else
             {
@@ -2502,7 +2504,7 @@ namespace Ship_Game
 
         void Bankruptcy()
         {
-            if (data.TurnsBelowZero >= RandomMath.RollDie(8))
+            if (data.TurnsBelowZero > RandomMath.AvgRandomBetween(0f,8f))
             {
                 Log.Info($"Rebellion for: {data.Traits.Name}");
 

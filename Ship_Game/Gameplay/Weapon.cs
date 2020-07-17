@@ -167,6 +167,7 @@ namespace Ship_Game.Gameplay
         public bool TerminalPhaseAttack;
         public float TerminalPhaseDistance;
         public float TerminalPhaseSpeedMod = 2f;
+        public float DelayedIgnition;
         public float ArmourPen = 0f;
         public string SecondaryFire;
         public bool AltFireMode;
@@ -931,6 +932,9 @@ namespace Ship_Game.Gameplay
 
             if (TerminalPhaseAttack)
                 off *= 1 + TerminalPhaseDistance * TerminalPhaseSpeedMod / 50000;
+
+            if (DelayedIgnition.Greater(0))
+                off *= 1 - (DelayedIgnition / 10).UpperBound(0.95f); 
 
 
             // FB: Added correct exclusion offense calcs

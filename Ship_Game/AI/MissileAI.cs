@@ -29,18 +29,18 @@ namespace Ship_Game.AI
         float DelayedIgnitionTimer;
 
 
-        public MissileAI(Projectile missile, GameplayObject target)
+        public MissileAI(Projectile missile, GameplayObject target, Vector2 initialVelocity)
         {
             Missile              = missile;
             Target               = target;
             DelayedIgnitionTimer = missile.Weapon.DelayedIgnition;
-            Missile.Velocity     = missile.Weapon.Owner?.Velocity ?? Vector2.Zero;
+            Missile.Velocity     = initialVelocity;
 
             if (Missile.Weapon.DelayedIgnition.Greater(0))
             {
                 float launchDir   = RandomMath.RollDie(2) == 1 ? -1.5708f : 1.5708f; // 90 degrees
                 float rotation    = Missile.Weapon.Owner?.Rotation ?? Missile.Rotation;
-                Missile.Velocity += (rotation + launchDir).RadiansToDirection() * (100 + RandomMath.RollDie(20));
+                Missile.Velocity += (rotation + launchDir).RadiansToDirection() * (100 + RandomMath.RollDie(100));
             }
 
             if (Missile.Weapon != null && Missile.Weapon.Tag_Torpedo)
@@ -188,6 +188,12 @@ namespace Ship_Game.AI
                 if (Jammed)
                 {
                     MoveTowardsTargetJammed(elapsedTime);
+                    return;
+                }
+
+                if (Missile.Weapon.MirvWarheads > 0 && distanceToTarget <= Missile.Weapon.MirvSeparationDistance)
+                {
+                    Missile.CreateMirv(Target);
                     return;
                 }
 

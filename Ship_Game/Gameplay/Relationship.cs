@@ -616,13 +616,11 @@ namespace Ship_Game.Gameplay
             if (Treaty_Alliance || Treaty_OpenBorders) 
                 return;
 
-            float strShipsInBorders = us.GetEmpireAI().ThreatMatrix.StrengthOfAllEmpireShipsInBorders(them);
+            float strShipsInBorders = us.GetEmpireAI().ThreatMatrix.StrengthOfAllEmpireShipsInBorders(us, them);
             if (strShipsInBorders > 0)
             {
-                if (!Treaty_NAPact)
-                    Anger_FromShipsInOurBorders += (100f - Trust) / 100f * strShipsInBorders / (us.MilitaryScore);
-                else
-                    Anger_FromShipsInOurBorders += (100f - Trust) / 100f * strShipsInBorders / (us.MilitaryScore * 2f);
+                int multiplier = Treaty_NAPact ? 1 : 2; // We are less concerned if we have NAP with them
+                Anger_FromShipsInOurBorders += (100f - Trust) / 100f * strShipsInBorders / (us.MilitaryScore * multiplier);
             }
         }
 
@@ -661,16 +659,10 @@ namespace Ship_Game.Gameplay
 
         void UpdateThreat(Empire us, Empire them)
         {
-            if (us.MilitaryScore < 1000f)
-            {
-                Threat = 0f;
-                return;
-            }
-
-            float ourMilScore   = 2300f + us.MilitaryScore;
+            float ourMilScore   = 2300f + us.MilitaryScore; // The 2300 is to reduce fluctuations for small numbers
             float theirMilScore = 2300f + them.MilitaryScore;
-            Threat              = (theirMilScore - ourMilScore) / ourMilScore * 100;
-            Threat              = Threat.UpperBound(100);
+            Threat              = (theirMilScore - ourMilScore) / ourMilScore * 100; // This will give a threat of -100 to 100
+
         }
 
         public bool AttackForBorderViolation(DTrait personality, Empire targetEmpire, Empire attackingEmpire, bool isTrader = true)
@@ -971,8 +963,8 @@ namespace Ship_Game.Gameplay
             Offer demandTech       = new Offer();
 
             demandTech.TechnologiesOffered.AddUnique(techToDemand.UID);
-            XenoDemandedTech = true;
-            Offer theirDemand          = new Offer
+            XenoDemandedTech  = true;
+            Offer theirDemand = new Offer
             {
                 AcceptDL      = "Xeno Demand Tech Accepted",
                 RejectDL      = "Xeno Demand Tech Rejected",
@@ -1019,7 +1011,10 @@ namespace Ship_Game.Gameplay
 
             Empire them = Them;
             if (us.Personality == PersonalityType.Aggressive && Threat < -15f)
-                Anger_DiplomaticConflict += 0.1f;
+            {
+                float angerMod = -Threat / 15;// every -15 threat will give +0.1 anger
+                Anger_DiplomaticConflict += us.data.DiplomaticPersonality.AngerDissipation + 0.1f * angerMod;
+            }
 
             if (Anger_MilitaryConflict >= 5 && !AtWar && !Treaty_Peace)
             {
@@ -1040,17 +1035,17 @@ namespace Ship_Game.Gameplay
 
         bool TheyArePotentialTargetRuthless(Empire us, Empire them)
         {
-            if (ActiveWar != null)
+            if (ActiveWar != null && ActiveWar.WarType != WarType.DefensiveWar)
                 return false;
 
             if (Threat > 0f || TurnsKnown < SecondDemand)
                 return false;
 
-            if (Threat < -40f && !Treaty_Alliance)
+            if (Threat < -75f && !Treaty_Alliance)
                 return true;
 
             // Ruthless will break alliances if the other party does not have strong military but valuable colonies
-            if (Threat < -40f && us.TotalColonyValues < them.TotalColonyValues)
+            if (Threat < -75f && us.TotalColonyValues < them.TotalColonyValues)
                 return true;
 
             return false;
@@ -1058,15 +1053,15 @@ namespace Ship_Game.Gameplay
 
         bool TheyArePotentialTargetAggressive(Empire us, Empire them)
         {
-            if (ActiveWar != null)
+            if (ActiveWar != null && ActiveWar.WarType != WarType.DefensiveWar)
                 return false;
 
-            if (Threat < -15f && TurnsKnown > SecondDemand && !Treaty_Alliance)
+            if (Threat < -40f && TurnsKnown > SecondDemand && !Treaty_Alliance)
             {
                 if (TotalAnger > 75f || us.MaxColonyValue < them.MaxColonyValue)
                     return true;
             }
-            else if (Threat <= -45f && TotalAnger > 20f)
+            else if (Threat <= -75f && TotalAnger > 20f)
             {
                 return true;
             }
@@ -1137,7 +1132,7 @@ namespace Ship_Game.Gameplay
                     break;
             }
 
-            if (!AtWar && TheyArePotentialTargetRuthless(us, them))
+            if (TheyArePotentialTargetRuthless(us, them))
                 theyArePotentialTargets = true;
         }
 

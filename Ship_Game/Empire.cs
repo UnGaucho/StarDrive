@@ -2438,7 +2438,12 @@ namespace Ship_Game
                                         Universe.NotificationManager.AddPeacefulMergerNotification(biggest, strongest);
                                     else
                                         Universe.NotificationManager.AddSurrendered(biggest, strongest);
+
                                     biggest.AbsorbEmpire(strongest);
+                                    if (biggest.GetRelations(this).ActiveWar == null)
+                                        biggest.GetEmpireAI().DeclareWarOn(this, WarType.ImperialistWar);
+                                    else
+                                        biggest.GetRelations(this).ActiveWar.WarTheaters.AddCaptureAll();
                                 }
                             }
                         }

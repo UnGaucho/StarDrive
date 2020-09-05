@@ -445,7 +445,7 @@ namespace Ship_Game
                 var info = new FileInfo($"{data.path}/Saved Games/{data.SaveAs}{ext}");
                 using (FileStream writeStream = info.OpenWrite())
                 {
-                    PerfTimer t = PerfTimer.StartNew();
+                    PerfTimer t = new PerfTimer();
                     if (NewFormat)
                     {
                         using (var textWriter = new StreamWriter(writeStream))
@@ -499,7 +499,7 @@ namespace Ship_Game
             UniverseSaveData usData;
             var decompressed = new FileInfo(HelperFunctions.Decompress(compressedSave));
 
-            PerfTimer t = PerfTimer.StartNew();
+            PerfTimer t = new PerfTimer();
             if (decompressed.Extension == NewExt) // new save format
             {
                 using (FileStream stream = decompressed.OpenRead())
@@ -622,6 +622,7 @@ namespace Ship_Game
             [Serialize(15)] public Vector2 TetherOffset;
             [Serialize(16)] public Guid TargetShipGuid;
             [Serialize(17)] public int TargetEmpireId;
+            [Serialize(18)] public float StarDateAdded;
         }
 
         public class GSAISAVE

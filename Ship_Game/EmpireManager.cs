@@ -129,6 +129,19 @@ namespace Ship_Game
             return allies;
         }
 
+        public static Array<Empire> GetEnemies(Empire e)
+        {
+            var enemies = new Array<Empire>();
+
+            for (int i = 0; i < Empires.Count; i++)
+            {
+                Empire empire = Empires[i];
+                if (e.IsEmpireHostile(empire))
+                    enemies.Add(empire);
+            }
+            return enemies;
+        }
+
         public static Array<Empire> GetTradePartners(Empire e)
         {
             var allies = new Array<Empire>();
@@ -262,10 +275,9 @@ namespace Ship_Game
         public static void RestoreUnserializableDataFromSave()
         {
             if (Empires.IsEmpty)
-                Log.Error($"must be called after empireList is populated.");
+                Log.Error("must be called after empireList is populated.");
             
-            Empire.Universe.AsyncDataCollector.Initialize();
-            Empire.Universe.WarmUpShipsForLoad();
+            Empire.Universe.WarmUpShipsForLoad(GameBase.Base.Elapsed);
             foreach(Empire empire in Empires)
             { 
                 empire.GetEmpireAI().EmpireDefense = empire.GetEmpireAI().EmpireDefense ?? War.CreateInstance(empire, empire, WarType.EmpireDefense);

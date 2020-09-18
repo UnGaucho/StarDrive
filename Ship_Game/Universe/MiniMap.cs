@@ -63,7 +63,7 @@ namespace Ship_Game
             return rscale;
         }
 
-        public override void Draw(SpriteBatch batch)
+        public override void Draw(SpriteBatch batch, DrawTimes elapsed)
         {
             if (!Visible)
                 return;
@@ -123,10 +123,10 @@ namespace Ship_Game
             batch.DrawLine(new Vector2(ActualMap.X + ActualMap.Width, rightMiddleView.Y), rightMiddleView, Color.White);
 
             ShipScreen.IsToggled     = screen.showingFTLOverlay;
-            DeepSpaceBuild.IsToggled = screen.showingDSBW;
+            DeepSpaceBuild.IsToggled = screen.DeepSpaceBuildWindow.Visible;
             AIScreen.IsToggled       = screen.aw.IsOpen;
             Fleets.IsToggled         = screen.showingRangeOverlay;            
-            base.Draw(batch);
+            base.Draw(batch, elapsed);
         }
 
         void DrawNode(Empire empire, IList<Empire.InfluenceNode> list, SpriteBatch batch)

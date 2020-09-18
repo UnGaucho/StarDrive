@@ -152,7 +152,7 @@ namespace Ship_Game
                 Vector2 planetScreenPos = ProjectToScreenPosition(planet.Center, 2500f);
                 float planetOrbitRadius = sysScreenPos.Distance(planetScreenPos);
 
-                if (viewState > UnivScreenState.ShipView)
+                if (viewState > UnivScreenState.ShipView && !IsCinematicModeEnabled)
                 {
                     var transparentDarkGray = new Color(50, 50, 50, 90);
                     DrawCircle(sysScreenPos, planetOrbitRadius, transparentDarkGray, 3f);
@@ -251,18 +251,18 @@ namespace Ship_Game
                     for (int x = 0; x < enemies.Count; x++)
                     {
                         var empire = enemies[x];
-                        if (!ssp.HasSeenEmpires.KnownBy(empire)) continue;
-
-                        var screenPos = ProjectToScreenPosition(ssp.Center);
-                        var flag = empire.data.Traits.FlagIndex;
-                        int xPos = (int)screenPos.X + (15 + GlobalStats.IconSize) * spacing;
-                        Rectangle rectangle2 = new Rectangle(xPos, (int) screenPos.Y, 15 + GlobalStats.IconSize, 15 + GlobalStats.IconSize);
-                        ScreenManager.SpriteBatch.Draw(ResourceManager.Flag(flag), rectangle2, ApplyCurrentAlphaToColor(empire.EmpireColor));
-                        spacing++;
+                        if (ssp.HasSeenEmpires.KnownBy(empire))
+                        {
+                            var screenPos = ProjectToScreenPosition(ssp.Center);
+                            var flag = empire.data.Traits.FlagIndex;
+                            int xPos = (int)screenPos.X + (15 + GlobalStats.IconSize) * spacing;
+                            Rectangle rectangle2 = new Rectangle(xPos, (int)screenPos.Y, 15 + GlobalStats.IconSize, 15 + GlobalStats.IconSize);
+                            batch.Draw(ResourceManager.Flag(flag), rectangle2, ApplyCurrentAlphaToColor(empire.EmpireColor));
+                            spacing++;
+                        }
                     }
                 }
             }
-
         }
 
         void DrawSolarSystemSectorView(SolarSystem solarSystem)
@@ -591,7 +591,7 @@ namespace Ship_Game
             }
         }
 
-        void Render(SpriteBatch batch, FrameTimes elapsed)
+        void Render(SpriteBatch batch, DrawTimes elapsed)
         {
             if (Frustum == null)
                 Frustum = new BoundingFrustum(View * Projection);
@@ -599,7 +599,7 @@ namespace Ship_Game
                 Frustum.Matrix = View * Projection;
 
             CreateShipSceneObjects();
-            ScreenManager.BeginFrameRendering(ref View, ref Projection);
+            ScreenManager.BeginFrameRendering(elapsed, ref View, ref Projection);
 
             RenderBackdrop(batch);
 
@@ -665,23 +665,22 @@ namespace Ship_Game
             }
             if (!Paused) // Particle pools need to be updated
             {
-                float deltaTime = elapsed.RealTime.Seconds;
-                beamflashes.Update(deltaTime);
-                explosionParticles.Update(deltaTime);
-                photonExplosionParticles.Update(deltaTime);
-                explosionSmokeParticles.Update(deltaTime);
-                projectileTrailParticles.Update(deltaTime);
-                fireTrailParticles.Update(deltaTime);
-                smokePlumeParticles.Update(deltaTime);
-                fireParticles.Update(deltaTime);
-                engineTrailParticles.Update(deltaTime);
-                star_particles.Update(deltaTime);
-                neb_particles.Update(deltaTime);
-                flameParticles.Update(deltaTime);
-                SmallflameParticles.Update(deltaTime);
-                sparks.Update(deltaTime);
-                lightning.Update(deltaTime);
-                flash.Update(deltaTime);
+                beamflashes.Update(elapsed);
+                explosionParticles.Update(elapsed);
+                photonExplosionParticles.Update(elapsed);
+                explosionSmokeParticles.Update(elapsed);
+                projectileTrailParticles.Update(elapsed);
+                fireTrailParticles.Update(elapsed);
+                smokePlumeParticles.Update(elapsed);
+                fireParticles.Update(elapsed);
+                engineTrailParticles.Update(elapsed);
+                star_particles.Update(elapsed);
+                neb_particles.Update(elapsed);
+                flameParticles.Update(elapsed);
+                SmallflameParticles.Update(elapsed);
+                sparks.Update(elapsed);
+                lightning.Update(elapsed);
+                flash.Update(elapsed);
             }
             ScreenManager.EndFrameRendering();
             if (viewState < UnivScreenState.SectorView)

@@ -759,6 +759,7 @@ namespace Ship_Game
 
             Log.Info("CreatingNewGameScreen.UpdateAllSystems(0.01)");
             us.UpdateAllSystems(new FixedSimTime(0.01f));
+            us.UpdateAllShips(new FixedSimTime(0.01f));
             ScreenManager.Music.Stop();
             ScreenManager.RemoveScreen(MainMenu);
  
@@ -766,7 +767,7 @@ namespace Ship_Game
             return true;
         }
 
-        public override void Draw(SpriteBatch batch)
+        public override void Draw(SpriteBatch batch, DrawTimes elapsed)
         {
             ScreenManager.GraphicsDevice.Clear(Color.Black);
 

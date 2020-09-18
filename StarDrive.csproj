@@ -456,6 +456,7 @@
     </Compile>
     <Compile Include="Ship_Game\Ships\Ship_Update.cs" />
     <Compile Include="Ship_Game\Spatial\QtreeNode.cs" />
+    <Compile Include="Ship_Game\Spatial\QtreeRecycleBuffer.cs" />
     <Compile Include="Ship_Game\Spatial\Quadtree.Collision.cs" />
     <Compile Include="Ship_Game\Spatial\Quadtree.cs" />
     <Compile Include="Ship_Game\Spatial\Quadtree.Debug.cs" />
@@ -1855,6 +1856,12 @@
     </Content>
     <Content Include="Content\Buildings\Xeno Mine.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content\Cursors\CinematicCursor.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Content\Cursors\Cursor.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Content\Encounter Dialogs\Corsairs001_ToPlayerDemandtMoneyKnown.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

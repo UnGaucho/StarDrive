@@ -13,6 +13,43 @@ namespace Ship_Game
     {
         public readonly ActionQueue EmpireUpdateQueue = new ActionQueue();
         readonly object ShipPoolLock = new object();
+        readonly object SimTimeLock = new object();
+
+        readonly AggregatePerfTimer EmpireUpdatePerf = new AggregatePerfTimer();
+        readonly AggregatePerfTimer UpdateSysPerf    = new AggregatePerfTimer();
+        readonly AggregatePerfTimer UpdateShipsPerf  = new AggregatePerfTimer();
+        readonly AggregatePerfTimer PreEmpirePerf    = new AggregatePerfTimer();
+        readonly AggregatePerfTimer PostEmpirePerf   = new AggregatePerfTimer();
+        readonly AggregatePerfTimer CollisionTime    = new AggregatePerfTimer();
+        readonly AggregatePerfTimer TurnTimePerf     = new AggregatePerfTimer();
+        readonly AggregatePerfTimer ProcessSimTurnsPerf = new AggregatePerfTimer();
+
+        // This is our current time in simulation time axis [0 .. current .. target]
+        float CurrentSimTime;
+
+        // This is the known end time in simulation time axis [0 ... target]
+        float TargetSimTime;
+
+        // Modifier to increase or reduce simulation fidelity
+        int SimFPSModifier;
+
+        PerfTimer TimeSinceLastAutoFPS = new PerfTimer();
+
+        int CurrentSimFPS => GlobalStats.SimulationFramesPerSecond + SimFPSModifier;
+        int ActualSimFPS => (int)(TurnTimePerf.MeasuredSamples / GameSpeed);
+
+        /// <summary>
+        /// NOTE: This must be called from UI Update thread to advance the simulation time forward
+        /// GameSpeed modifies the target simulation time advancement
+        /// Simulation time can be advanced by any arbitrary amount
+        /// </summary>
+        void AdvanceSimulationTargetTime(float deltaTimeFromUI)
+        {
+            lock (SimTimeLock)
+            {
+                TargetSimTime += deltaTimeFromUI * GameSpeed;
+            }
+        }
 
         void ProcessTurnsMonitored()
         {
@@ -27,7 +64,6 @@ namespace Ship_Game
         void ProcessTurns()
         {
             int failedLoops = 0; // for detecting cyclic crash loops
-            float simulationTimeSink = 0f;
 
             while (ProcessTurnsThread != null)
             {
@@ -39,7 +75,8 @@ namespace Ship_Game
                     if (ProcessTurnsThread == null)
                         break; // this thread is aborting
 
-                    ProcessTurns(GameBase.Base.Elapsed, ref simulationTimeSink);
+                    ProcessSimTurnsPerf.Start();
+                    ProcessSimulationTurns();
                     failedLoops = 0; // no exceptions this turn
                 }
                 catch (ThreadAbortException)
@@ -57,18 +94,7 @@ namespace Ship_Game
                 }
                 finally
                 {
-                    // if the debug window hits a cyclic crash it can be turned off in game.
-                    // i don't see a point in crashing the game because of a debug window error.
-                    try
-                    {
-                        if (Debug)
-                            DebugWin?.Update(GameBase.Base.Elapsed.RealTime.Seconds);
-                    }
-                    catch
-                    {
-                        Debug = false;
-                        Log.Warning("DebugWindowCrashed");
-                    }
+                    ProcessSimTurnsPerf.Stop();
 
                     // Notify Draw() that taketurns has finished and another frame can be drawn now
                     ProcessTurnsCompletedEvt.Set();
@@ -76,62 +102,102 @@ namespace Ship_Game
             }
         }
 
-        void ProcessTurns(FrameTimes elapsed, ref float simulationTimeSink)
+        void ProcessSimulationTurns()
         {
-            ScreenManager.ExecutePendingEmpireActions();
+            // Execute all the actions submitted from UI thread
+            // into this Simulation / Empire thread
+            ScreenManager.InvokePendingEmpireThreadActions();
 
             if (Paused)
             {
                 ++TurnId;
                 UpdateAllSystems(FixedSimTime.Zero/*paused*/);
-                DeepSpaceThread(FixedSimTime.Zero/*paused*/);
+                UpdateAllShips(FixedSimTime.Zero/*paused*/);
                 RecomputeFleetButtons(true);
             }
             else
             {
-                NotificationManager.Update(elapsed.RealTime);
-                AutoSaveTimer -= elapsed.RealTime.Seconds;
-
-                if (AutoSaveTimer <= 0f)
-                {
-                    AutoSaveTimer = GlobalStats.AutoSaveFreq;
-                    DoAutoSave();
-                }
+                CheckAutoSaveTimer();
 
                 if (IsActive)
                 {
-                    float timeBetweenTurns = elapsed.SimulationStep.FixedTime / GameSpeed;
+                    // Edge case: user manually edited global sim FPS
+                    while (SimFPSModifier < 0 && CurrentSimFPS < 10)
+                        SimFPSModifier += 5;
 
-                    // advance the simulation time sink by the real elapsed time
-                    simulationTimeSink += elapsed.RealTime.Seconds;
+                    // If we increase GameSpeed, also do less simulation steps to speed things up
+                    // And at 0.5x speed, do twice as many steps.
+                    // Note: beyond 2x step we suffer major precision issues, so we use clamp
+                    float gameSpeed = GameSpeed.UpperBound(2);
+                    float fixedTimeStep = (1f / CurrentSimFPS) * gameSpeed;
+                    var fixedSimStep = new FixedSimTime(fixedTimeStep);
+
+                    // put a limit to simulation iterations
+                    // because sometimes we cannot catch up
+                    int MAX_ITERATIONS = (int)(30 * GameSpeed);
 
                     // run the allotted number of game turns
                     // if Simulation FPS is `10` and game speed is `0.5`, this will run 5x per second
                     // if Simulation FPS is `60` and game speed is `4.0`, this will run 240x per second
                     // if the game freezes due to rendering or some other issue,
                     // the simulation time sink will record the missed time and process missed turns
-                    while (simulationTimeSink >= timeBetweenTurns)
+                    int simIterations = 0;
+                    for (; simIterations < MAX_ITERATIONS; ++simIterations)
                     {
-                        simulationTimeSink -= timeBetweenTurns;
+                        lock (SimTimeLock)
+                        {
+                            float newSimTime = CurrentSimTime + fixedSimStep.FixedTime;
+                            if (newSimTime > TargetSimTime)
+                                break;
+                            CurrentSimTime = newSimTime;
+                        }
+
                         ++TurnId;
-                        ProcessTurnDelta(elapsed.SimulationStep);
+                        
+                        TurnTimePerf.Start();
+                        ProcessTurnDelta(fixedSimStep);
+                        TurnTimePerf.Stop();
                     }
+
+                    AutoAdjustSimulationFrameRate();
 
                     if (GlobalStats.RestrictAIPlayerInteraction)
                     {
-                        if (PerfTotalTurnTime.MeasuredSamples > 0 && PerfTotalTurnTime.AvgTime * GameSpeed < 0.05f)
+                        if (TurnTimePerf.MeasuredSamples > 0 && TurnTimePerf.AvgTime * GameSpeed < 0.05f)
+                        {
                             ++GameSpeed;
+                        }
                         else if (--GameSpeed < 1.0f)
+                        {
                             GameSpeed = 1.0f;
+                        }
                     }
+                }
+            }
+        }
+
+        void AutoAdjustSimulationFrameRate()
+        {
+            if (TimeSinceLastAutoFPS.Elapsed > 1f)
+            {
+                TimeSinceLastAutoFPS.Start();
+
+                // Are we running slowly?
+                if (CurrentSimFPS > 10 && TurnTimePerf.MeasuredTotal > 0.7f)
+                {
+                    SimFPSModifier -= 5;
+                    Log.Warning($"GAME RUNNING SLOW, REDUCING SIM FPS to: {CurrentSimFPS}");
+                }
+                else if (SimFPSModifier < 0 && TurnTimePerf.MeasuredTotal < 0.4f)
+                {
+                    SimFPSModifier += 5;
+                    Log.Warning($"GAME RUNNING FAST AGAIN, INCREASING FPS to: {CurrentSimFPS}");
                 }
             }
         }
 
         void ProcessTurnDelta(FixedSimTime timeStep)
         {
-            PerfTotalTurnTime.Start(); // total do work perf counter
-
             GlobalStats.BeamTests = 0;
             GlobalStats.Comparisons = 0;
             GlobalStats.ComparisonCounter += 1;
@@ -143,56 +209,57 @@ namespace Ship_Game
 
                 PostEmpireUpdates(timeStep);
 
-                // this will update all ship Center coordinates
-                ProcessTurnShipsAndSystems(timeStep);
+                UpdateAllSystems(timeStep);
+                UpdateAllShips(timeStep);
+                UpdateAllModulePositions(timeStep);
 
                 CollisionTime.Start();
-
-                // The lock assures that the asyncdatacollocter is finished before the quad manager updates.
-                // anything after this lock and before QueueActionForThreading should be thread safe.
-                // update spatial manager after ships have moved.
-                // all the collisions will be triggered here:
-                lock (SpaceManager.LockSpaceManager)
-                {
-                    SpaceManager.Update(timeStep);
-                }
-
+                SpaceManager.Update(timeStep);
                 CollisionTime.Stop();
 
                 ProcessTurnUpdateMisc(timeStep);
             }
-
-            PerfTotalTurnTime.Stop();
         }
 
+        void CheckAutoSaveTimer()
+        {
+            GameBase game = GameBase.Base;
+            if (LastAutosaveTime == 0f)
+                LastAutosaveTime = game.TotalElapsed;
 
+            float timeSinceLastAutoSave = (game.TotalElapsed - LastAutosaveTime);
+            if (timeSinceLastAutoSave >= GlobalStats.AutoSaveFreq)
+            {
+                LastAutosaveTime = game.TotalElapsed;
+                AutoSaveCurrentGame();
+            }
+        }
 
-            /// <summary>
+        /// <summary>
         /// Used to make ships alive at game load
         /// </summary>
-        public void WarmUpShipsForLoad(FrameTimes elapsed)
+        public void WarmUpShipsForLoad()
         {
-            // makes sure all empire vision is updated.
-            UpdateAllShipPositions(elapsed.SimulationStep);
+            var simTime = new FixedSimTime(CurrentSimFPS);
 
-            lock (SpaceManager.LockSpaceManager)
-            {
-                SpaceManager.Update(elapsed.SimulationStep);
-            }
+            // makes sure all empire vision is updated.
+            UpdateAllModulePositions(simTime);
+
+            SpaceManager.Update(simTime);
 
             foreach (Empire empire in EmpireManager.Empires)
             {
-                UpdateShipSensorsAndInfluence(elapsed.SimulationStep, empire);
+                UpdateShipSensorsAndInfluence(simTime, empire);
             }
 
             // TODO: some checks rely on previous frame information, this is a defect
             //       so we run this a second time
             foreach (Empire empire in EmpireManager.Empires)
             {
-                UpdateShipSensorsAndInfluence(elapsed.SimulationStep, empire);
+                UpdateShipSensorsAndInfluence(simTime, empire);
             }
 
-            PostEmpireUpdates(elapsed.SimulationStep);
+            PostEmpireUpdates(simTime);
 
             foreach (Ship ship in MasterShipList)
             {
@@ -204,65 +271,28 @@ namespace Ship_Game
 
         void RemoveDeadProjectiles()
         {
-            for (int i = 0; i < DeepSpaceShips.Count; i++)
-                DeepSpaceShips[i].RemoveDyingProjectiles();
-
-            for (int i = 0; i < SolarSystemList.Count; i++)
+            for (int i = 0; i < MasterShipList.Count; i++)
             {
-                SolarSystem system = SolarSystemList[i];
-                for (int j = 0; j < system.ShipList.Count; ++j)
-                    system.ShipList[j].RemoveDyingProjectiles();
+                Ship ship = MasterShipList[i];
+                ship.RemoveDyingProjectiles();
+            }
+        }
+
+        public void UpdateStarDateAndTriggerEvents(float newStarDate)
+        {
+            StarDate = (float)Math.Round(newStarDate, 1);
+
+            ExplorationEvent evt = ResourceManager.EventByDate(StarDate);
+            if (evt != null)
+            {
+                Log.Info($"Trigger Timed Exploration Event  StarDate:{StarDate}");
+                evt.TriggerExplorationEvent(this);
             }
         }
 
         void ProcessTurnUpdateMisc(FixedSimTime timeStep)
         {
             UpdateClickableItems();
-
-            bool flag1 = false;
-            lock (GlobalStats.ClickableSystemsLock)
-            {
-                for (int i = 0; i < ClickPlanetList.Count; ++i)
-                {
-                    ClickablePlanets planet = ClickPlanetList[i];
-                    if (Input.CursorPosition.InRadius(planet.ScreenPos, planet.Radius))
-                    {
-                        flag1 = true;
-                        TooltipTimer -= 0.01666667f;
-                        tippedPlanet = planet;
-                    }
-                }
-            }
-            if (TooltipTimer <= 0f && !LookingAtPlanet)
-                TooltipTimer = 0.5f;
-            if (!flag1)
-            {
-                ShowingPlanetToolTip = false;
-                TooltipTimer = 0.5f;
-            }
-
-            bool clickedOnSystem = false;
-            if (viewState > UnivScreenState.SectorView)
-            {
-                lock (GlobalStats.ClickableSystemsLock)
-                {
-                    for (int i = 0; i < ClickableSystems.Count; ++i)
-                    {
-                        ClickableSystem system = ClickableSystems[i];
-                        if (Input.CursorPosition.InRadius(system.ScreenPos, system.Radius))
-                        {
-                            sTooltipTimer -= 0.01666667f;
-                            tippedSystem = system;
-                            clickedOnSystem = true;
-                        }
-                    }
-                }
-                if (sTooltipTimer <= 0f)
-                    sTooltipTimer = 0.5f;
-            }
-
-            if (!clickedOnSystem)
-                ShowingSysTooltip = false;
 
             JunkList.ApplyPendingRemovals();
             
@@ -357,19 +387,16 @@ namespace Ship_Game
 
             EmpireUpdateQueue.SubmitWork(() =>
             {
-                lock (SpaceManager.LockSpaceManager)
+                lock (ShipPoolLock)
                 {
-                    UpdateAllShipPositions(timeStep);
                     AllPlanetsScanAndFire(timeStep);
                     UpdateShipSensorsAndInfluence(timeStep, empireToUpdate);
-                }
-
-                lock (ShipPoolLock)
                     FireAllShipWeapons(timeStep);
+                }
             });
         }
 
-        void UpdateAllShipPositions(FixedSimTime timeStep)
+        void UpdateAllModulePositions(FixedSimTime timeStep)
         {
             bool isSystemView = (viewState <= UnivScreenState.SystemView);
             // Update all ships and projectors in the universe
@@ -393,8 +420,9 @@ namespace Ship_Game
             if (ourEmpire.IsEmpireDead())
                 return;
 
-            var ourShips = ourEmpire.GetShips();
-            Parallel.For(ourShips.Count, (start, end) =>
+            Ship[] ourShips = ourEmpire.GetShips().AtomicCopy();
+
+            Parallel.For(ourShips.Length, (start, end) =>
             {
                 for (int i = start; i < end; i++)
                 {
@@ -434,18 +462,6 @@ namespace Ship_Game
                     ship.AI.UpdateCombatStateAI(timeStep);
                 }
             }, MaxTaskCores);
-        }
-
-        void ProcessTurnShipsAndSystems(FixedSimTime timeStep)
-        {
-            PerfShipsAndSystems.Start();
-            DeepSpaceThread(timeStep);
-
-            for (int i = 0; i < SolarSystemList.Count; i++)
-            {
-                SolarSystemList[i].Update(timeStep, this);
-            }
-            PerfShipsAndSystems.Stop();
         }
 
         bool ProcessTurnEmpires(FixedSimTime timeStep)
@@ -510,7 +526,7 @@ namespace Ship_Game
             }
 
             PreEmpirePerf.Stop();
-
+            
             if (!Paused && IsActive)
             {
                 EmpireUpdatePerf.Start();
@@ -534,42 +550,38 @@ namespace Ship_Game
             return !Paused;
         }
 
-        public Vector2 PathMapPointToWorld(int x, int y, int universeOffSet)
-        {
-            return new Vector2((x - universeOffSet) * PathMapReducer,
-                (y - universeOffSet) * PathMapReducer);
-        }
-
-        public Point WorldToPathMap(Vector2 worldPostion, int universeOffSet)
-        {
-            int x = universeOffSet;
-            int y = universeOffSet;
-            float xround = worldPostion.X > 0 ? .5f : -.5f;
-            float yround = worldPostion.Y > 0 ? .5f : -.5f;
-            x += (int)(worldPostion.X / PathMapReducer + xround);
-            y += (int)(worldPostion.Y / PathMapReducer + yround);
-            y = y.Clamped(0, universeOffSet * 2);
-            x = x.Clamped(0, universeOffSet * 2);
-            return new Point(x, y);
-        }
-
-        public void DeepSpaceThread(FixedSimTime timeStep)
-        {
-            SpaceManager.GetDeepSpaceShips(DeepSpaceShips);
-
-            for (int i = 0; i < DeepSpaceShips.Count; i++)
-            {
-                DeepSpaceShips[i].Update(timeStep);
-            }
-        }
-
         public void UpdateAllSystems(FixedSimTime timeStep)
         {
             if (IsExiting)
                 return;
-
-            foreach (SolarSystem system in SolarSystemList)
+            
+            UpdateSysPerf.Start();
+            for (int i = 0; i < SolarSystemList.Count; ++i)
+            {
+                SolarSystem system = SolarSystemList[i];
                 system.Update(timeStep, this);
+            }
+            UpdateSysPerf.Stop();
+        }
+
+        public void UpdateAllShips(FixedSimTime timeStep)
+        {
+            if (IsExiting)
+                return;
+
+            UpdateShipsPerf.Start();
+            Parallel.For(MasterShipList.Count, (start, end) =>
+            {
+                for (int i = start; i < end; ++i)
+                {
+                    Ship ship = MasterShipList[i];
+                    if (ship != null && ship.Active)
+                    {
+                        ship.Update(timeStep);
+                    }
+                }
+            });
+            UpdateShipsPerf.Stop();
         }
 
         void HandleGameSpeedChange(InputState input)

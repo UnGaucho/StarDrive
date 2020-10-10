@@ -104,12 +104,13 @@ namespace Ship_Game
 
         void ProcessSimulationTurns()
         {
-            // Execute all the actions submitted from UI thread
-            // into this Simulation / Empire thread
-            ScreenManager.InvokePendingEmpireThreadActions();
+
 
             if (Paused)
             {
+                // Execute all the actions submitted from UI thread
+                // into this Simulation / Empire thread
+                ScreenManager.InvokePendingEmpireThreadActions();
                 ++TurnId;
                 UpdateAllSystems(FixedSimTime.Zero/*paused*/);
                 UpdateAllShips(FixedSimTime.Zero/*paused*/);
@@ -334,43 +335,6 @@ namespace Ship_Game
                     var empire = EmpireManager.Empires[i];
                     empire.GetEmpireAI().ThreatMatrix.ProcessPendingActions();
                 }
-
-                if (timeStep.FixedTime > 0f && --shiptimer <= 0.0f)
-                {
-                    shiptimer = 2f;
-                    Parallel.For(MasterShipList.Count, (start, end) =>
-                    {
-                        for (int i = start; i < end; ++i)
-                        {
-                            var ship = MasterShipList[i];
-                            {
-                                if (ship.NotInSpatial == false && (ship.IsSubspaceProjector || ship.IsPlatformOrStation && ship.System != null))
-                                    continue;
-                                
-                                if (!ship.InRadiusOfCurrentSystem)
-                                {
-                                    //lock (UniverseScreen.SpaceManager.LockSpaceManager)
-                                        ship.SetSystem(null);
-
-                                    for (int x = 0; x < SolarSystemList.Count; x++)
-                                    {
-                                        SolarSystem system = SolarSystemList[x];
-
-                                        if (ship.InRadiusOfSystem(system))
-                                        {
-                                           system.SetExploredBy(ship.loyalty);
-                                           ship.SetSystem(system);
-
-                                           // No need to keep looping through all other systems
-                                            // if one is found -Gretman
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }, MaxTaskCores);
-                }
             }
 
             PostEmpirePerf.Stop();
@@ -389,12 +353,43 @@ namespace Ship_Game
             {
                 lock (ShipPoolLock)
                 {
-                    AllPlanetsScanAndFire(timeStep);
+                    FleetSpeed(timeStep);
                     UpdateShipSensorsAndInfluence(timeStep, empireToUpdate);
-                    FireAllShipWeapons(timeStep);
                 }
             });
         }
+
+        void AssignSystemsToShips(FixedSimTime timeStep)
+        {
+            Parallel.For(MasterShipList.Count, (start, end) =>
+            {
+                for (int i = start; i < end; ++i)
+                {
+                    // this can be done more efficiently.                     
+                    Ship ship = MasterShipList[i];
+                    {
+                        if (!ship.Active || ship.IsPlatformOrStation && ship.InSpatial)
+                            continue; // Orbitals updated in spatial do not need checking since they do not change system
+
+                        if (ship.ShipInitialized && !ship.InRadiusOfCurrentSystem)
+                        {
+                            ship.SetSystem(null);
+                            for (int x = 0; x < SolarSystemList.Count; x++)
+                            {
+                                SolarSystem system = SolarSystemList[x];
+                                if (ship.InRadiusOfSystem(system))
+                                {
+                                    system.SetExploredBy(ship.loyalty);
+                                    ship.SetSystem(system);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }, MaxTaskCores);
+        }
+
 
         void UpdateAllModulePositions(FixedSimTime timeStep)
         {
@@ -420,13 +415,16 @@ namespace Ship_Game
             if (ourEmpire.IsEmpireDead())
                 return;
 
-            Ship[] ourShips = ourEmpire.GetShips().AtomicCopy();
+            var ourShips = ourEmpire.GetShipsAtomic();
+            //var ourShips = ourEmpire.GetShips();
+            //ourShips.AddRange(ourEmpire.GetProjectors());            
 
             Parallel.For(ourShips.Length, (start, end) =>
             {
                 for (int i = start; i < end; i++)
                 {
                     Ship ourShip = ourShips[i];
+                    if (!ourShip.Active) continue;
                     ourShip.UpdateSensorsAndInfluence(timeStep);
                 }
             }, MaxTaskCores);
@@ -434,7 +432,7 @@ namespace Ship_Game
             ourEmpire.UpdateContactsAndBorders(timeStep);
         }
 
-        void AllPlanetsScanAndFire(FixedSimTime timeStep)
+        void FleetSpeed(FixedSimTime timeStep)
         {
             Parallel.For(EmpireManager.Empires.Count, (start, end) =>
             {
@@ -445,21 +443,6 @@ namespace Ship_Game
                     {
                         kv.Value.SetSpeed();
                     }
-
-                    foreach (var planet in empire.GetPlanets())
-                        planet.UpdateSpaceCombatBuildings(timeStep); // building weapon timers are in this method. 
-                }
-            }, MaxTaskCores);
-        }
-
-        void FireAllShipWeapons(FixedSimTime timeStep)
-        {
-            Parallel.For(MasterShipList.Count, (start, end) =>
-            {
-                for (int i = start; i < end; i++)
-                {
-                    var ship = MasterShipList[i];
-                    ship.AI.UpdateCombatStateAI(timeStep);
                 }
             }, MaxTaskCores);
         }
@@ -508,6 +491,9 @@ namespace Ship_Game
             // threads iterating the master ship list or empire owned ships should not run through this lock if it can be helped. 
             lock (ShipPoolLock)
             {
+                // Execute all the actions submitted from UI thread
+                // into this Simulation / Empire thread
+                ScreenManager.InvokePendingEmpireThreadActions();
                 //clear out general object removal.
                 RemoveDeadProjectiles();
                 TotallyRemoveGameplayObjects();
@@ -523,6 +509,7 @@ namespace Ship_Game
                     }
                 }, MaxTaskCores);
                 MasterShipList.ApplyPendingRemovals();
+                AssignSystemsToShips(timeStep);
             }
 
             PreEmpirePerf.Stop();
@@ -547,6 +534,7 @@ namespace Ship_Game
                 EmpireUpdatePerf.Stop();
                 return true;
             }
+            
             return !Paused;
         }
 
@@ -570,17 +558,15 @@ namespace Ship_Game
                 return;
 
             UpdateShipsPerf.Start();
-            Parallel.For(MasterShipList.Count, (start, end) =>
+
+            for (int i = 0; i < MasterShipList.Count; i++)
             {
-                for (int i = start; i < end; ++i)
+                Ship ship = MasterShipList[i];
+                if (ship != null && ship.Active)
                 {
-                    Ship ship = MasterShipList[i];
-                    if (ship != null && ship.Active)
-                    {
-                        ship.Update(timeStep);
-                    }
+                    ship.Update(timeStep);
                 }
-            });
+            }
             UpdateShipsPerf.Stop();
         }
 

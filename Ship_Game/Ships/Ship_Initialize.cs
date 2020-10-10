@@ -182,7 +182,6 @@ namespace Ship_Game.Ships
             kills            = save.kills;
             PowerCurrent     = save.Power;
             yRotation        = save.yRotation;
-            Ordinance        = save.Ordnance;
             Rotation         = save.Rotation;
             Velocity         = save.Velocity;
             IsSpooling       = save.AfterBurnerOn;
@@ -191,16 +190,19 @@ namespace Ship_Game.Ships
             TetherOffset     = save.TetherOffset;
             InCombat         = InCombatTimer > 0f;
 
-            TransportingFood         = save.TransportingFood;
-            TransportingProduction   = save.TransportingProduction;
-            TransportingColonists    = save.TransportingColonists;
-            AllowInterEmpireTrade    = save.AllowInterEmpireTrade;
-            TradeRoutes              = save.TradeRoutes ?? new Array<Guid>(); // the null check is here in order to not break saves.
+            TransportingFood          = save.TransportingFood;
+            TransportingProduction    = save.TransportingProduction;
+            TransportingColonists     = save.TransportingColonists;
+            AllowInterEmpireTrade     = save.AllowInterEmpireTrade;
+            TradeRoutes               = save.TradeRoutes ?? new Array<Guid>(); // the null check is here in order to not break saves.
+            MechanicalBoardingDefense = save.MechanicalBoardingDefense;
 
             VanityName = shipData.Role == ShipData.RoleName.troop && save.TroopList.NotEmpty
                             ? save.TroopList[0].Name : save.VanityName;
 
             HealthMax = RecalculateMaxHealth();
+            CalcTroopBoardingDefense();
+            ChangeOrdnance(save.Ordnance);
 
             if (save.HomePlanetGuid != Guid.Empty)
                 HomePlanet = loyalty.FindPlanet(save.HomePlanetGuid);
@@ -356,6 +358,9 @@ namespace Ship_Game.Ships
             AI.TargetGuid         = aiSave.AttackTarget;
             AI.SystemToDefendGuid = aiSave.SystemToDefend;
             AI.EscortTargetGuid   = aiSave.EscortTarget;
+            AI.HasPriorityTarget  = aiSave.PriorityTarget;
+
+            AI.SetPriorityOrder(aiSave.PriorityOrder);
         }
 
         public void InitializeShip(bool loadingFromSaveGame = false)
@@ -390,7 +395,6 @@ namespace Ship_Game.Ships
             if (!loadingFromSaveGame)
                 InitializeStatus(false);
 
-            SetSystem(System);
             InitExternalSlots();
             Initialize();
 
@@ -514,9 +518,7 @@ namespace Ship_Game.Ships
                 OrdinanceMax    += module.OrdinanceCapacity;
 
                 if (!fromSave)
-                {
-                    Ordinance += module.OrdinanceCapacity;
-                }
+                    ChangeOrdnance(module.OrdinanceCapacity);
             }
 
             if (!fromSave)
@@ -530,7 +532,7 @@ namespace Ship_Game.Ships
                 TroopCapacity = 1; // set troopship and assault shuttle not to have 0 TroopCapacity since they have no modules with TroopCapacity
 
             (Thrust, WarpThrust, TurnThrust) = ShipStats.GetThrust(ModuleSlotList, shipData);
-            Mass         = ShipStats.GetMass(ModuleSlotList, loyalty);
+            Mass         = ShipStats.GetMass(ModuleSlotList, loyalty, OrdnancePercent);
             FTLSpoolTime = ShipStats.GetFTLSpoolTime(ModuleSlotList, loyalty);
 
             MechanicalBoardingDefense = MechanicalBoardingDefense.LowerBound(1);

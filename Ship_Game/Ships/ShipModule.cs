@@ -207,7 +207,7 @@ namespace Ship_Game.Ships
 
         public SubTexture ModuleTexture => ResourceManager.Texture(IconTexturePath);
 
-        public float ActualPowerStoreMax   => PowerStoreMax * Bonuses.FuelCellMod;
+        public float ActualPowerStoreMax   => Is(ShipModuleType.FuelCell) ? PowerStoreMax * Bonuses.FuelCellMod : PowerStoreMax;
         public float ActualPowerFlowMax    => PowerFlowMax  * Bonuses.PowerFlowMod;
         public float ActualBonusRepairRate => BonusRepairRate * Bonuses.RepairRateMod;
         public float ActualShieldPowerMax { get; private set; }
@@ -223,6 +223,7 @@ namespace Ship_Game.Ships
                 return Flyweight.PowerFlowMax >= 1f;
             if (type == ShipModuleType.Shield)
                 return Flyweight.shield_power_max >= 1f;
+
             return ModuleType == type;
         }
 
@@ -826,20 +827,17 @@ namespace Ship_Game.Ships
             Parent.ShouldRecalculatePower |= ActualPowerFlowMax > 0 || PowerRadius > 0;
             Parent.UpdateExternalSlots(this, becameActive: false);
 
-            if (!cleanupOnly)
+            if (!cleanupOnly && source != null)
             {
                 if (Parent.Active && Parent.InFrustum && Empire.Universe.viewState <= UniverseScreen.UnivScreenState.ShipView)
                 {
                     GameAudio.PlaySfxAsync("sd_explosion_module_small", Parent.SoundEmitter);
                 }
+
                 if (explodes)
                 {
-                    GameplayObject damageCauser = Parent.LastDamagedBy;
-                    if (damageCauser == null)
-                        Log.Error("LastDamagedBy is not properly set. Please check projectile damage code!");
-                    else
-                        UniverseScreen.SpaceManager.ExplodeAtModule(damageCauser, this,
-                            ignoresShields: true, damageAmount: ExplosionDamage, damageRadius: ExplosionRadius);
+                    UniverseScreen.SpaceManager.ExplodeAtModule(source, this,
+                        ignoresShields: true, damageAmount: ExplosionDamage, damageRadius: ExplosionRadius);
                 }
             }
         }
@@ -877,7 +875,8 @@ namespace Ship_Game.Ships
 
             if (hangarTimer <= 0f && hangarShip == null) // launch the troopship
             {
-                hangarShip = Ship.CreateTroopShipAtPoint(Ship.GetAssaultShuttleName(Parent.loyalty), Parent.loyalty, Center, troop);
+                hangarShip = Ship.CreateTroopShipAtPoint(Ship.GetAssaultShuttleName(Parent.loyalty), Parent.loyalty,
+                    Center, troop);
                 hangarShip.Mothership = Parent;
                 hangarShip.DoEscort(Parent);
                 hangarShip.Velocity = Parent.Velocity + UniverseRandom.RandomDirection() * hangarShip.SpeedLimit;
@@ -903,28 +902,29 @@ namespace Ship_Game.Ships
                     || hangarShip.AI.IgnoreCombat
                     || hangarShip.AI.Target != null
                     || (hangarShip.Center.InRadius(Parent.Center, Parent.SensorRange) && hangarShip.AI.State != AIState.ReturnToHangar))
-                        return;
+                    return;
                 hangarShip.DoEscort(Parent);
                 return;
             }
-            if (hangarTimer > 0f || (hangarShip != null && (hangarShip == null || hangarShip.Active)))
-                return;
 
-            SetHangarShip(Ship.CreateShipFromHangar(this, Parent.loyalty, Parent.Center + LocalCenter, Parent));
-            if (hangarShip == null)
+            if (hangarTimer <= 0f && (hangarShip == null || hangarShip != null && !hangarShip.Active))
             {
-                Log.Warning($"Could not create ship from hangar, UID = {hangarShipUID}");
-                return;
+                SetHangarShip(Ship.CreateShipFromHangar(this, Parent.loyalty, Parent.Center + LocalCenter, Parent));
+                if (hangarShip == null)
+                {
+                    Log.Warning($"Could not create ship from hangar, UID = {hangarShipUID}");
+                    return;
+                }
+
+                hangarShip.DoEscort(Parent);
+                hangarShip.Velocity = Parent.Velocity + UniverseRandom.RandomDirection() * GetHangarShip().SpeedLimit;
+
+                hangarShip.Mothership = Parent;
+                HangarShipGuid = GetHangarShip().guid;
+
+                hangarTimer = hangarTimerConstant;
+                Parent.ChangeOrdnance(-hangarShip.ShipOrdLaunchCost);
             }
-
-            hangarShip.DoEscort(Parent);
-            hangarShip.Velocity = Parent.Velocity + UniverseRandom.RandomDirection() * GetHangarShip().SpeedLimit;
-
-            hangarShip.Mothership = Parent;
-            HangarShipGuid = GetHangarShip().guid;
-
-            hangarTimer = hangarTimerConstant;
-            Parent.ChangeOrdnance(-hangarShip.ShipOrdLaunchCost);
         }
 
         public void SetAttributes()
@@ -1052,11 +1052,14 @@ namespace Ship_Game.Ships
             return shieldPower.Clamped(0, shieldMax);
         }
 
-        public float GetActualMass(Empire loyalty)
+        public float GetActualMass(Empire loyalty, float ordnancePercent)
         {
             float mass = Mass;
             if (Is(ShipModuleType.Armor))
                 mass *= loyalty.data.ArmourMassModifier;
+
+            if (Is(ShipModuleType.Ordnance))
+                mass = (mass * ordnancePercent).LowerBound(mass * 0.1f);
 
             // regular positive mass modules
             if (mass >= 0f)
@@ -1064,10 +1067,7 @@ namespace Ship_Game.Ships
 
             // only allow negative mass modules (mass reduction devices)
             // if we're powered, otherwise return their absolute mass
-            if (Powered)
-                return mass;
-            else
-                return Math.Abs(mass);
+            return Powered ? mass : Math.Abs(mass);
         }
 
         // @note This is called every frame for every module for every ship in the universe

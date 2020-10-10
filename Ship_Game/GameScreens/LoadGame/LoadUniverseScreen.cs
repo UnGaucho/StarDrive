@@ -181,7 +181,8 @@ namespace Ship_Game
             CreateFleetsFromSave(saveData, data);              step.Advance();
             CreateTasksGoalsRoads(saveData, data);             step.Advance();
             CreatePlanetImportExportShipLists(saveData, data); step.Advance();
-            RestoreSolarSystemCQs(saveData, data); step.Finish();
+            UpdateDefenseShipBuildingOffense();                step.Advance();
+            RestoreSolarSystemCQs(saveData, data);             step.Finish();
             return data;
         }
 
@@ -290,30 +291,12 @@ namespace Ship_Game
                 }
             }
 
-            foreach (SolarSystem s in data.SolarSystemsList)
-            {
-                foreach (Planet p in s.PlanetList)
-                {
-                    foreach (Guid station in p.OrbitalStations.Keys.ToArray())
-                    {
-                        if (station == ship.guid)
-                        {
-                            p.OrbitalStations[station] = ship;
-                            ship.TetherToPlanet(p);
-                        }
-                    }
-                }
-            }
-
             if (data.FindPlanet(ship.AI.OrbitTargetGuid, out Planet toOrbit))
             {
                 if (ship.AI.State == AIState.Orbit)
                     ship.AI.OrderToOrbit(toOrbit);
             }
 
-            if (ship.shipData.IsShipyard && !ship.IsTethered)
-                ship.Active = false;
-            
             ship.AI.SystemToDefend = data.FindSystemOrNull(ship.AI.SystemToDefendGuid);
             ship.AI.EscortTarget   = data.FindShipOrNull(ship.AI.EscortTargetGuid);
             ship.AI.Target         = data.FindShipOrNull(ship.AI.TargetGuid);

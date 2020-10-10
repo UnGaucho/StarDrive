@@ -2032,11 +2032,11 @@ An empire's counter-espionage budget reduces your intelligence penetration
     </Token>
     <Token>
       <Index>571</Index>
-      <Text>This technology will switch all of your ships' power cells over to the newer Deuterium standard.  Deuterium cells can hold 20% more power than a standard cell, which translates into longer effective range for ships as well as greater energy pools available for combat systems. </Text>
+      <Text>This technology will switch all of your ships' dedicated power cells over to the newer Deuterium standard.  Deuterium cells can hold 20% more power than a standard cell, which translates into longer effective range for ships as well as greater energy pools available for combat systems. </Text>
     </Token>
     <Token>
       <Index>572</Index>
-      <Text>Gain an empire-wide 20% bonus to the amount of power that is stored in fuel cells</Text>
+      <Text>Gain an empire-wide 20% bonus to the amount of power that is stored in dedicated power cells</Text>
     </Token>
     <Token>
       <Index>573</Index>
@@ -2044,9 +2044,8 @@ An empire's counter-espionage budget reduces your intelligence penetration
     </Token>
     <Token>
       <Index>574</Index>
-      <Text>Iridium has proven itself the superior element for power storage purposes.  This technology switches all of your empire's fuel cells to the Iridium standard, increasing fuel cell efficiency by a total of 50%. </Text>
+      <Text>Iridium has proven itself the superior element for power storage purposes.  This technology switches all of your empire's dedicated power cells to the Iridium standard, increasing dedicated power cell efficiency by a total of 50%. </Text>
     </Token>
-
     <Token>
       <Index>576</Index>
       <Text>Fusion Beams</Text>
@@ -6081,7 +6080,7 @@ An empire's counter-espionage budget reduces your intelligence penetration
     </Token>
     <Token>
       <Index>2214</Index>
-      <Text>Orders the ship to return to the nearest shipyard to be dismantled. The planet where the ship is dismantled will have a portion of the ship's original production cost added to its production stockpile</Text>
+      <Text>Orders the ship to return to the nearest shipyard to be dismantled. The planet where the ship is dismantled will have a portion of the ship's original production cost added to its production stockpile. SHIFT clicking on this ship will order ALL ships of the same design to be dismantled!</Text>
     </Token>
     <Token>
       <Index>2215</Index>
@@ -8870,7 +8869,7 @@ An empire's counter-espionage budget reduces your intelligence penetration
     </Token>
   <Token>
       <Index>7005</Index>
-      <Text>Order ship back to the shipyards to be scrapped. If that ship is of a foreign hull, your engineers might be able to reverse engineer the hull.</Text>
+      <Text>Order ship back to the shipyards to be scrapped. If that ship is of a foreign hull, your engineers might be able to reverse engineer the hull. If you want to Mass scrap ALL ships of this design, use the 'Ships Array' screen and order scrap with SHIFT click.</Text>
     </Token>
   <Token>
       <Index>7006</Index>

@@ -194,6 +194,7 @@ namespace Ship_Game
         public EmpireUI UI;
         public int GetEmpireTechLevel() => (int)Math.Floor(ShipTechs.Count / 3f);
         public Vector2 WeightedCenter;
+        public bool RushAllConsturction;
 
         public int AtWarCount;
         public Array<string> BomberTech      = new Array<string>();
@@ -311,6 +312,17 @@ namespace Ship_Game
                 capital = capitals.First();
 
             return capitals.Length > 0;
+        }
+
+        public string GetAssaultShuttleName() // this will get the name of an Assault Shuttle if defined in race.xml or use default one
+        {
+            return data.DefaultAssaultShuttle.IsEmpty() ? BoardingShuttle.Name : data.DefaultAssaultShuttle;
+        }
+
+        public string GetSupplyShuttleName() // this will get the name of a Supply Shuttle if defined in race.xml or use default one
+        {
+            return data.DefaultSupplyShuttle.IsEmpty() ? SupplyShuttle.Name
+                                                       : data.DefaultSupplyShuttle;
         }
 
         public bool FindClosestSpacePort(Vector2 position, out Planet closest)
@@ -2115,6 +2127,12 @@ namespace Ship_Game
             return num;
         }
 
+        public void SwitchRushAllConstruction(bool rush)
+        {
+            foreach (Planet planet in OwnedPlanets)
+                planet.Construction.SwitchRushAllConstruction(rush);
+        }
+
         public Planet.ColonyType AssessColonyNeeds2(Planet p)
         {
             float fertility = p.FertilityFor(this);
@@ -3361,6 +3379,7 @@ namespace Ship_Game
             float creditsToCharge           = rush ? cost : ProductionCreditCost(cost);
             MoneySpendOnProductionThisTurn += creditsToCharge; 
             AddMoney(-creditsToCharge);
+            //Log.Info($"Charging Credits from {Name}: {creditsToCharge}, Rush: {rush}"); // For testing
         }
 
         void RefundCredits(float cost, float percentOfAmount)

@@ -589,19 +589,40 @@ namespace Ship_Game
             return planets;
         }
 
-        public float RacialEnvModifer(PlanetCategory category)
+        /// <summary>
+        /// Returns the Player's Environment Modifier based on a planet's category.
+        /// </summary>
+        public float PlayerEnvModifier(PlanetCategory category) => RacialEnvModifer(category, EmpireManager.Player);
+
+        /// <summary>
+        /// Returns the Player's Preferred Environment Modifier.
+        /// </summary>
+        public float PlayerPreferredEnvModifier 
+            => RacialEnvModifer(EmpireManager.Player.data.PreferredEnv, EmpireManager.Player);
+
+
+        /// <summary>
+        /// Returns the preferred Environment Modifier of a given empire.
+        /// </summary>
+        public static float PreferredEnvModifier(Empire empire)
+            => empire == null ? 1 :  RacialEnvModifer(empire.data.PreferredEnv, empire);
+
+        public static float RacialEnvModifer(PlanetCategory category, Empire empire)
         {
             float modifer = 1f; // If no Env tags were found, the multiplier is 1.
+            if (empire == null)
+                return modifer;
+
             switch (category)
             {
-                case PlanetCategory.Terran:  modifer = data.EnvTerran;  break;
-                case PlanetCategory.Oceanic: modifer = data.EnvOceanic; break;
-                case PlanetCategory.Steppe:  modifer = data.EnvSteppe;  break;
-                case PlanetCategory.Tundra:  modifer = data.EnvTundra;  break;
-                case PlanetCategory.Swamp:   modifer = data.EnvSwamp;   break;
-                case PlanetCategory.Desert:  modifer = data.EnvDesert;  break;
-                case PlanetCategory.Ice:     modifer = data.EnvIce;     break;
-                case PlanetCategory.Barren:  modifer = data.EnvBarren;  break;
+                case PlanetCategory.Terran:  modifer = empire.data.EnvTerran;  break;
+                case PlanetCategory.Oceanic: modifer = empire.data.EnvOceanic; break;
+                case PlanetCategory.Steppe:  modifer = empire.data.EnvSteppe;  break;
+                case PlanetCategory.Tundra:  modifer = empire.data.EnvTundra;  break;
+                case PlanetCategory.Swamp:   modifer = empire.data.EnvSwamp;   break;
+                case PlanetCategory.Desert:  modifer = empire.data.EnvDesert;  break;
+                case PlanetCategory.Ice:     modifer = empire.data.EnvIce;     break;
+                case PlanetCategory.Barren:  modifer = empire.data.EnvBarren;  break;
             }
 
             return modifer;
@@ -1311,22 +1332,13 @@ namespace Ship_Game
             if (node.SourceObject is Ship)
                 return;
 
-            bool debug = Universe?.Debug == true;
-
             // find ships in radius of node. 
             GameplayObject[] targets = UniverseScreen.Spatial.FindNearby(GameObjectType.Ship,
                                                         node.Position, node.Radius, maxResults:1024);
             for (int i = 0; i < targets.Length; i++)
             {
-                var target = (Ship)targets[i];
-                target.KnownByEmpires.SetSeen(this);
-                if (debug)
-                {
-                    if (Universe?.SelectedPlanet != null || Universe?.SelectedPlanet == node.SourceObject)
-                    {
-                        target.KnownByEmpires.SetSeen(EmpireManager.Player);
-                    }
-                }
+                var targetShip = (Ship)targets[i];
+                targetShip.KnownByEmpires.SetSeen(this);
             }
         }	
 
@@ -1990,7 +2002,9 @@ namespace Ship_Game
                 troopShips = new Array<Ship>(OwnedShips
                     .Filter(troopship => troopship.Name == data.DefaultTroopShip
                                         && troopship.HasOurTroops
-                                        && (troopship.AI.State == AIState.AwaitingOrders || troopship.AI.State == AIState.Orbit)
+                                        && (troopship.AI.State == AIState.AwaitingOrders 
+                                            || troopship.AI.State == AIState.Orbit
+                                            || troopship.AI.State == AIState.HoldPosition)
                                         && troopship.fleet == null && !troopship.InCombat)
                     .OrderBy(distance => Vector2.Distance(distance.Center, objectCenter)));
 
@@ -2992,37 +3006,27 @@ namespace Ship_Game
             if (isPlayer && !AutoExplore)
                 return;
 
-            int unexplored =0;
-            bool haveUnexploredSystems = false;
-            for (int i = 0; i < UniverseScreen.SolarSystemList.Count; i++)
-            {
-                SolarSystem solarSystem = UniverseScreen.SolarSystemList[i];
-                if (solarSystem.IsExploredBy(this)) 
-                    continue;
-
-                if (++unexplored > 20) 
-                    break;
-            }
-
-            haveUnexploredSystems = unexplored != 0;
-            int numScouts = 0;
-            if (!haveUnexploredSystems)
+            int unexplored = UniverseScreen.SolarSystemList.Count(s => !s.IsExploredBy(this)).UpperBound(21);
+            if (unexplored == 0)
             {
                 for (int i = 0; i < OwnedShips.Count; i++)
                 {
                     Ship ship = OwnedShips[i];
-                    if (ship.AI.State == AIState.Explore)
-                        ship.AI.OrderOrbitNearest(true);
+                    if (IsScout(ship) && ship.AI.State != AIState.Scrap)
+                        ship.AI.OrderScrapShip();
                 }
                 return;
             }
 
-            var desiredScouts = unexplored * Research.Strategy.ExpansionRatio * 0.75f;
+            float desiredScouts = unexplored * Research.Strategy.ExpansionRatio;
+            if (!isPlayer)
+                desiredScouts *= ((int)CurrentGame.Difficulty).LowerBound(1);
+
+            int numScouts = 0;
             for (int i = 0; i < OwnedShips.Count; i++)
             {
                 Ship ship = OwnedShips[i];
-                if (isPlayer && ship.Name == data.CurrentAutoScout
-                    || !isPlayer && ship.DesignRole == ShipData.RoleName.scout && ship.fleet == null )
+                if (IsScout(ship))
                 {
                     ship.DoExplore();
                     if (++numScouts >= desiredScouts)
@@ -3035,8 +3039,15 @@ namespace Ship_Game
                 return;
 
             EmpireAI.Goals.Add(new BuildScout(this));
-        }
 
+
+            // local 
+            bool IsScout(Ship s)
+            {
+                return isPlayer && s.Name == data.CurrentAutoScout 
+                       || !isPlayer && s.DesignRole == ShipData.RoleName.scout && s.fleet == null;
+            }
+        }
         private void ApplyFertilityChange(float amount)
         {
             if (amount.AlmostEqual(0)) return;

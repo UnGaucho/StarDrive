@@ -62,9 +62,9 @@ namespace Ship_Game
         }
 
 
-        private static bool MatchI(Restrictions b) => b == Restrictions.I || b == Restrictions.IO || b == Restrictions.IE;
-        private static bool MatchO(Restrictions b) => b == Restrictions.O || b == Restrictions.IO || b == Restrictions.OE;
-        private static bool MatchE(Restrictions b) => b == Restrictions.E || b == Restrictions.IE || b == Restrictions.OE;
+        private static bool MatchI(Restrictions b) => b == Restrictions.I || b == Restrictions.IO || b == Restrictions.IE || b == Restrictions.IOE;
+        private static bool MatchO(Restrictions b) => b == Restrictions.O || b == Restrictions.IO || b == Restrictions.OE || b == Restrictions.IOE;
+        private static bool MatchE(Restrictions b) => b == Restrictions.E || b == Restrictions.IE || b == Restrictions.OE || b == Restrictions.IOE;
 
         private static bool IsPartialMatch(Restrictions a, Restrictions b)
         {

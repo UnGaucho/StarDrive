@@ -196,7 +196,7 @@ namespace Ship_Game
             {
                 return; // configuration file is missing
             }
-
+            // venus release
             Version = (Assembly.GetEntryAssembly()?
                 .GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)
                 as AssemblyInformationalVersionAttribute[])?[0].InformationalVersion ?? "";

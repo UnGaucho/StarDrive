@@ -8,7 +8,7 @@ set day=%date:~7,2%
 
 :: Get the branch name and replace release/ with empty and / with _
 for /f "delims=" %%b in ('git name-rev --name-only HEAD') do set name=%%b
-set name=%name:release/=%
+
 set name=%name:/=_%
 
 :: Get current revision `7912`

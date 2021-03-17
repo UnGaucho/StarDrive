@@ -764,6 +764,7 @@ namespace Ship_Game
             {
                 ship.AI.ClearOrders();
             }
+
             EmpireAI.Goals.Clear();
             EmpireAI.EndAllTasks();
             foreach (var kv in FleetsDict)

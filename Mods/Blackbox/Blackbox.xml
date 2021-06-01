@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ModInformation>
+  <ModName>Blackbox</ModName>
+  <ModDescription>Top Secret</ModDescription>
+  <PortraitPath>small.png</PortraitPath>
+  <ModImagePath>large.png</ModImagePath>
+  <MaxOpponents>8</MaxOpponents>  
+  <Version>1A</Version>
+  <SpaceportScale>0.5</SpaceportScale>
+  <ClearVanillaTechs>true</ClearVanillaTechs>
+  <UseResearchableShipTechs>true</UseResearchableShipTechs>
+  <ChangeResearchCostBasedOnSize>true</ChangeResearchCostBasedOnSize>
+  <CostBasedOnSizeThreshold>1800</CostBasedOnSizeThreshold>
+  <DefaultNumOpponents>4</DefaultNumOpponents>
+  <HangarCombatShipCostMultiplier>4</HangarCombatShipCostMultiplier>
+  <DisplayEnvPerfInRaceDesign>true</DisplayEnvPerfInRaceDesign>
+  <Author>Unknown</Author>
+  <SupportedBlackBoxVersions>develop</SupportedBlackBoxVersions> <!-- Use commas for multiple version support -->
+  <URL>Comming to Steam Soon</URL>
+  <BitbucketAPIString>https://api.bitbucket.org/2.0/repositories/codegremlins/combined-arms/downloads</BitbucketAPIString>
+  <DownLoadSite>???</DownLoadSite>
+</ModInformation>

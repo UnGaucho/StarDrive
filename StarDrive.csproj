@@ -5865,6 +5865,7 @@
     <Content Include="Mods\Blackbox\Buildings\Production\Space Port.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Buildings\Production\Upgraded Xeno mines.xml" />
     <Content Include="Mods\Blackbox\Buildings\Production\Xeno Mine.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

@@ -19,6 +19,9 @@
     <LeadsToTech>
       <UID>FigateEngines</UID>
     </LeadsToTech>
+    <LeadsToTech>
+      <UID>Fleet Supply</UID>
+    </LeadsToTech>
   </LeadsTo>
   <ModulesUnlocked>
     <UnlockedMod>

@@ -5625,9 +5625,6 @@
     <Content Include="Mods\Blackbox\Buildings\Civilian\Galactic Stock Exchange.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Mods\Blackbox\Buildings\Civilian\Genetics Lab.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Mods\Blackbox\Buildings\Civilian\HDZone.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -5883,6 +5880,7 @@
     <Content Include="Mods\Blackbox\Buildings\Remnant tree\Signal Origin.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Buildings\Research\Genetics Lab.xml" />
     <Content Include="Mods\Blackbox\Buildings\Research\ResearchLab.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -6939,6 +6937,7 @@
     <Content Include="Mods\Blackbox\Technology\Ballistics\SubspaceArtillery.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Colonization\AdvancedXenoMine.xml" />
     <Content Include="Mods\Blackbox\Technology\Colonization\Aeroponics.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -6961,18 +6960,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Mods\Blackbox\Technology\Colonization\IndustrialFoundations.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Colonization\Military.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Colonization\Planetary Defense.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Colonization\Planetary Shielding.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Colonization\PlanetaryFortification.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Mods\Blackbox\Technology\Colonization\Rapid Cloning.xml">
@@ -7161,6 +7148,7 @@
     <Content Include="Mods\Blackbox\Technology\Ship construction\FighterTheory.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Ship construction\Fleet Supply.xml" />
     <Content Include="Mods\Blackbox\Technology\Ship construction\FrigateConstruction.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -7170,18 +7158,22 @@
     <Content Include="Mods\Blackbox\Technology\Ship construction\Integrated Systems.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Ship construction\LargeFabricator.xml" />
     <Content Include="Mods\Blackbox\Technology\Ship construction\LargeFreighters.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Ship construction\LargeOrdStorage.xml" />
     <Content Include="Mods\Blackbox\Technology\Ship construction\MediumFreighters.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Ship construction\ShipboardAssault.xml" />
     <Content Include="Mods\Blackbox\Technology\Ship construction\Shipyards.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Mods\Blackbox\Technology\Ship construction\StarshipConstruction.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Ship construction\SustainedWarefare.xml" />
     <Content Include="Mods\Blackbox\Technology\Ship construction\Titans.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -7248,9 +7240,6 @@
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\Customs Station.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Mods\Blackbox\Technology\Socio-logistics\Fleet Supply.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\Galactic Stock Exchange.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -7258,12 +7247,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\IS Government.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Socio-logistics\LargeFabricator.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Socio-logistics\LargeOrdStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\LargePlanetStockpile.xml">
@@ -7278,22 +7261,20 @@
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\Mercantilism.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Socio-logistics\Military.xml" />
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\NanoStorage.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Socio-logistics\Planetary Defense.xml" />
+    <Content Include="Mods\Blackbox\Technology\Socio-logistics\Planetary Shielding.xml" />
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\Planetary Stock Exchange.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Mods\Blackbox\Technology\Socio-logistics\PlanetaryFortification.xml" />
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\PlanetStockpile.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\Privatization.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Socio-logistics\ShipboardAssault.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Mods\Blackbox\Technology\Socio-logistics\SustainedWarefare.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Mods\Blackbox\Technology\Socio-logistics\Xeno Computing.xml">

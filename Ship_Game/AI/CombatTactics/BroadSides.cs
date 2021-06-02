@@ -21,16 +21,16 @@ namespace Ship_Game.AI.CombatTactics
         {
             CombatMoveState moveState = CombatMoveState.Error;
 
-            float maxCombatRange = DesiredCombatRange + Owner.Radius;
+            float maxCombatRange = DesiredCombatRange - Owner.Radius - OwnerTarget.Radius;
 
             if (DistanceToTarget > maxCombatRange)
             {
                 AI.SubLightMoveTowardsPosition(InitialMovePoint(DesiredCombatRange), timeStep);
                 moveState = CombatMoveState.Approach;
             }
-            else if (TargetIsMighty(ratioToOurDefense: 0.5f))
+            else if (DistanceToTarget < maxCombatRange *.75f && TargetIsMighty(ratioToOurDefense: 0.25f))
             {
-                Vector2 initialMovePoint = InitialMovePoint(DesiredCombatRange * 0.75f);
+                Vector2 initialMovePoint = InitialMovePoint(DesiredCombatRange * 0.5f);
                 AI.SubLightMoveTowardsPosition(initialMovePoint, timeStep);
                 moveState = CombatMoveState.Approach;
             }
@@ -64,9 +64,9 @@ namespace Ship_Game.AI.CombatTactics
                 initialOffset = initialDirection * DesiredCombatRange;
 
                 if (Direction == OrbitDirection.Left)
-                    initialOffset += initialDirection.LeftVector() * (wantedRangeToTarget * 0.25f);
+                    initialOffset += initialDirection.LeftVector() * (wantedRangeToTarget * 0.5f);
                 else
-                    initialOffset += initialDirection.RightVector() * (wantedRangeToTarget * 0.25f);
+                    initialOffset += initialDirection.RightVector() * (wantedRangeToTarget * 0.5f);
 
                 ForceOrbitOffSet(initialOffset);
             }

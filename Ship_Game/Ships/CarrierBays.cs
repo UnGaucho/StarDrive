@@ -29,7 +29,7 @@ namespace Ship_Game.Ships
         public bool RecallingShipsBeforeWarp { get; private set; }
         public static float DefaultHangarRange = 7500;
         public SupplyShuttles SupplyShuttle;
-        public float HangarRange => HasActiveHangars ? DefaultHangarRange : 0;
+        public float HangarRange => HasActiveHangars ? Owner.SensorRange : 0;
         public bool IsPrimaryCarrierRoleForLaunchRange => 
                                             HasActiveHangars &&
                                             (Owner.WeaponsMaxRange.AlmostZero()

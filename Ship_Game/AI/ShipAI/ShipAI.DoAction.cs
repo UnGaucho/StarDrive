@@ -88,10 +88,10 @@ namespace Ship_Game.AI
 
             // in range:
             float distanceToTarget = target.Center.Distance(Owner.Center);
-            if (HasPriorityOrder || distanceToTarget > Owner.DesiredCombatRange && distanceToTarget > 7500f)
+            if (distanceToTarget > Owner.DesiredCombatRange && distanceToTarget > 7500f)
             {
-                if (Owner.fleet == null || Owner.ShipEngines.ReadyForFormationWarp == Status.Good)
-                MoveToEngageTarget(target, timeStep);
+                if (HasPriorityTarget || Owner.fleet == null || Owner.ShipEngines.ReadyForFormationWarp >= Status.Poor)
+                    MoveToEngageTarget(target, timeStep);
             }
             else
             {
@@ -99,7 +99,7 @@ namespace Ship_Game.AI
                 if (Owner.engineState == Ship.MoveState.Warp)
                     Owner.HyperspaceReturn();
 
-                if (FleetNode != null && Owner.fleet != null && HasPriorityOrder)
+                if (FleetNode != null && Owner.fleet != null && !HasPriorityTarget)
                 {
                     // TODO: need to move this into fleet.
                     if (Owner.fleet.FleetTask == null)
@@ -155,18 +155,18 @@ namespace Ship_Game.AI
 
         void MoveToEngageTarget(Ship target, FixedSimTime timeStep)
         {
-            if (CombatRangeType == StanceType.RangedCombatMovement)
-            {
-                Vector2 prediction = target.Center;
-                Weapon fastestWeapon = Owner.FastestWeapon;
-                if (fastestWeapon != null && target.CurrentVelocity > 0) // if we have a weapon
-                {
-                    prediction = fastestWeapon.ProjectedImpactPointNoError(target);
-                }
+            //if (CombatRangeType == StanceType.RangedCombatMovement)
+            //{
+            //    Vector2 prediction = target.Center;
+            //    Weapon fastestWeapon = Owner.FastestWeapon;
+            //    if (fastestWeapon != null && target.CurrentVelocity > 0) // if we have a weapon
+            //    {
+            //        prediction = fastestWeapon.ProjectedImpactPointNoError(target);
+            //    }
 
-                ThrustOrWarpToPos(prediction, timeStep);
-            }
-            else
+            //    ThrustOrWarpToPos(prediction, timeStep);
+            //}
+            //else
             {
                 ThrustOrWarpToPos(Target.Center, timeStep);
             }

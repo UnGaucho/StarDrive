@@ -5,6 +5,8 @@ using Microsoft.Xna.Framework.Graphics;
 using Ship_Game.Gameplay;
 using Ship_Game.Ships;
 using System.Linq;
+using Ship_Game.Ships.Components;
+using Ship_Game.Ships.Components.CarrierBays;
 
 namespace Ship_Game.GameScreens.ShipDesign
 {

@@ -1,4 +1,6 @@
 ﻿using Ship_Game.Ships;
+using Ship_Game.Ships.Components;
+using Ship_Game.Ships.Components.CarrierBays;
 
 namespace Ship_Game.AI.CombatTactics
 {

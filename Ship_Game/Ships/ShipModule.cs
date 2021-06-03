@@ -6,6 +6,8 @@ using Ship_Game.Debug;
 using Ship_Game.Gameplay;
 using System;
 using System.Diagnostics.Contracts;
+using Ship_Game.Ships.Components;
+using Ship_Game.Ships.Components.CarrierBays;
 
 namespace Ship_Game.Ships
 {

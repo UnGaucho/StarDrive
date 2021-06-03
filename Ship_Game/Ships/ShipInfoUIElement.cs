@@ -5,6 +5,8 @@ using Microsoft.Xna.Framework.Input;
 using Ship_Game.AI;
 using Ship_Game.AI.CombatTactics.UI;
 using Ship_Game.Audio;
+using Ship_Game.Ships.Components;
+using Ship_Game.Ships.Components.CarrierBays;
 
 namespace Ship_Game.Ships
 {

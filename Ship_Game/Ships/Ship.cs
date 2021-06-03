@@ -14,6 +14,7 @@ using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
 using Ship_Game.Empires;
 using Ship_Game.Empires.Components;
+using Ship_Game.Ships.Components.CarrierBays;
 
 namespace Ship_Game.Ships
 {
@@ -197,7 +198,7 @@ namespace Ship_Game.Ships
         }
 
         Status FleetCapableStatus;
-        public bool CanTakeFleetMoveOrders() => 
+        public bool CanTakeFleetMoveOrders() =>
             Active && FleetCapableStatus == Status.Good && ShipEngines.EngineStatus >= Status.Poor;
 
         void SetFleetCapableStatus()
@@ -324,8 +325,8 @@ namespace Ship_Game.Ships
             if (IsSupplyShuttle)
                 return ResourceManager.Texture("TacticalIcons/symbol_supply");
 
-            string roleName = DesignRole == ShipData.RoleName.scout || DesignRole == ShipData.RoleName.troop 
-                ? DesignRole.ToString() 
+            string roleName = DesignRole == ShipData.RoleName.scout || DesignRole == ShipData.RoleName.troop
+                ? DesignRole.ToString()
                 : shipData.HullRole.ToString();
 
             string iconName = "TacticalIcons/symbol_";
@@ -468,7 +469,7 @@ namespace Ship_Game.Ships
                   //  return true;
                 //if (AI.Target?.GetLoyalty() == attacker)
                     //return true;
-                //if (attacker.isPlayer && !attackerToUs.Treaty_NAPact) 
+                //if (attacker.isPlayer && !attackerToUs.Treaty_NAPact)
                 //    return true;
             }
 
@@ -512,7 +513,7 @@ namespace Ship_Game.Ships
             if (IsInWarp
                 || AI.State == AIState.Scrap
                 || AI.State == AIState.Resupply
-                || AI.State == AIState.Refit 
+                || AI.State == AIState.Refit
                 || !CanBeRefitted
                 || shipData.Role == ShipData.RoleName.supply
                 || shipData.HullRole < ShipData.RoleName.fighter && shipData.HullRole != ShipData.RoleName.station
@@ -1111,7 +1112,7 @@ namespace Ship_Game.Ships
             UpdateInfluence(timeStep);
             KnownByEmpires.Update(timeStep);
             SetFleetCapableStatus();
-            
+
             // scan universe and make decisions for combat
             AI.StartSensorScan(timeStep);
         }
@@ -1119,7 +1120,7 @@ namespace Ship_Game.Ships
         public void UpdateModulePositions(FixedSimTime timeStep, bool isSystemView, bool forceUpdate = false)
         {
             if (Active && AI.BadGuysNear || (InFrustum && isSystemView) || forceUpdate)
-            {  
+            {
                 float cos = RadMath.Cos(Rotation);
                 float sin = RadMath.Sin(Rotation);
                 float tan = (float)Math.Tan(yRotation);
@@ -1163,7 +1164,7 @@ namespace Ship_Game.Ships
 
             if (ShouldRecalculatePower) // must be before ShipStatusChange
                 RecalculatePower();
-            
+
             if (OrdAddedPerSecond > 0f)
                 ChangeOrdnance(OrdAddedPerSecond); // Add ordnance
 
@@ -1245,7 +1246,7 @@ namespace Ship_Game.Ships
         {
             if (Health < 1f)
                 return;
-            
+
             Carrier.SupplyShuttle.ProcessSupplyShuttles(AI.GetSensorRadius());
 
             ResupplyReason resupplyReason = Supply.Resupply();
@@ -1260,7 +1261,7 @@ namespace Ship_Game.Ships
 
         public bool IsSuitableForPlanetaryRearm()
         {
-            if (InCombat 
+            if (InCombat
                 || !Active
                 || OrdnancePercent.AlmostEqual(1)
                 || IsPlatformOrStation && TetheredTo?.Owner == loyalty
@@ -1399,7 +1400,7 @@ namespace Ship_Game.Ships
 
         void ExplodeShip(float size, bool addWarpExplode)
         {
-            if (!InFrustum) 
+            if (!InFrustum)
                 return;
 
             var position = new Vector3(Center.X, Center.Y, -100f);
@@ -1626,7 +1627,7 @@ namespace Ship_Game.Ships
             {
                 RemoveFromUniverseUnsafe();
             }
-            
+
             // It's extremely important we manually clear these
             // The .NET GC is not able to handler all the cyclic references
             supplyLock?.Dispose(ref supplyLock);
@@ -1651,7 +1652,7 @@ namespace Ship_Game.Ships
             RepairBeams = null;
             HomePlanet = null;
             RemoveSceneObject();
-                        
+
             Stats?.Dispose();
             Cargo = null;
             ModuleSlotList = null;
@@ -1776,10 +1777,10 @@ namespace Ship_Game.Ships
                 }
             }
 
-            if (IsPlatformOrStation) 
+            if (IsPlatformOrStation)
                 offense /= 2;
 
-            if (!Carrier.HasFighterBays && !hasWeapons) 
+            if (!Carrier.HasFighterBays && !hasWeapons)
                 offense = 0f;
 
             return ShipBuilder.GetModifiedStrength(SurfaceArea, weaponArea + hangarArea, offense, defense);

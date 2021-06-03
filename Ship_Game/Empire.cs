@@ -1761,6 +1761,15 @@ namespace Ship_Game
             BestStationWeCanBuild  = BestShipWeCanBuild(ShipData.RoleName.station, this);
         }
 
+        private void UpdateAllCarrierHangarShips()
+        {
+            for (int i = 0; i < OwnedShips.Count; i++)
+            {
+                var ship = OwnedShips[i];
+                ship.Carrier.UpdateHangerShipsUID();
+            }
+        }
+
         public void UpdateDefenseShipBuildingOffense()
         {
             for (int i = 0 ; i < OwnedPlanets.Count; i++)
@@ -1995,13 +2004,19 @@ namespace Ship_Game
             if (!isFaction) return;
             foreach (Ship ship in ResourceManager.GetShipTemplates())
             {
-                if (data.Traits.ShipType == ship.shipData.ShipStyle
+                if (ship.shipData.Role != ShipData.RoleName.prototype
+                    && ship.shipData.Role != ShipData.RoleName.disabled
+                    && data.Traits.ShipType == ship.shipData.ShipStyle
                     || ship.shipData.ShipStyle == "Misc"
                     || ship.shipData.ShipStyle.IsEmpty())
                 {
                     ShipsWeCanBuild.Add(ship.Name);
                     foreach (ShipModule hangar in ship.Carrier.AllHangars)
-                        ShipsWeCanBuild.Add(hangar.hangarShipUID);
+                    {
+                        var fighter = ResourceManager.GetShipTemplate(hangar.hangarShipUID,false);
+                        if (fighter != null && fighter.shipData.Role != ShipData.RoleName.disabled && fighter.shipData.Role != ShipData.RoleName.prototype)
+                            ShipsWeCanBuild.Add(hangar.hangarShipUID);
+                    }
                 }
             }
             foreach (var hull in UnlockedHullsDict.Keys.ToArray())
@@ -2047,6 +2062,7 @@ namespace Ship_Game
             if (isPlayer)
                 Universe?.aw?.UpdateDropDowns();
 
+            UpdateAllCarrierHangarShips();
             UpdateBestOrbitals();
             UpdateDefenseShipBuildingOffense();
         }

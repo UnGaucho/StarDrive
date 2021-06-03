@@ -3,6 +3,8 @@ using Ship_Game.AI;
 using Ship_Game.Gameplay;
 using System;
 using Ship_Game.Data;
+using Ship_Game.Ships.Components;
+using Ship_Game.Ships.Components.CarrierBays;
 
 namespace Ship_Game.Ships
 {
@@ -555,7 +557,7 @@ namespace Ship_Game.Ships
 
             UpdateShields();
 
-            Carrier.PrepShipHangars(loyalty);
+            Carrier.UpdateHangerShipsUID();
 
             if (shipData.Role == ShipData.RoleName.troop)
                 TroopCapacity = 1; // set troopship and assault shuttle not to have 0 TroopCapacity since they have no modules with TroopCapacity

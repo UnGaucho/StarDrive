@@ -486,7 +486,7 @@
     <Compile Include="Ship_Game\Sensors\TargetData.cs" />
     <Compile Include="Ship_Game\Sensors\TimedScanner.cs" />
     <Compile Include="Ship_Game\Ships\AI\WayPoints.cs" />
-    <Compile Include="Ship_Game\Ships\CarrierBays.cs" />
+    <Compile Include="Ship_Game\Ships\Components\CarrierBays\CarrierBays.cs" />
     <Compile Include="Ship_Game\Ships\Components\KnownByEmpire.cs" />
     <Compile Include="Ship_Game\Ships\Components\ShipWeight.cs" />
     <Compile Include="Ship_Game\Ships\ModuleGrid.cs" />

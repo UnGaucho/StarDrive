@@ -21,7 +21,7 @@ namespace UnitTests.Fleets
             CreateGameInstance();
 
             // Excalibur class has all the bells and whistles
-            LoadStarterShips(new[] { "Excalibur-Class Supercarrier", "Corsair", "Supply Shuttle" });
+            LoadStarterShips(new[] { "Excalibur-Class Supercarrier", "Corsair", "Supply Shuttle", "Ving Defender" });
             CreateUniverseAndPlayerEmpire(out Empire empire);
             CreateTestEnv();
         }

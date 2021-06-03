@@ -13,7 +13,7 @@ namespace UnitTests.Ships
         public ShipAITests()
         {
             CreateGameInstance();
-            LoadStarterShips(new[] {"Excalibur-Class Supercarrier", "Owlwok Freighter S"});
+            LoadStarterShips(new[] {"Excalibur-Class Supercarrier", "Owlwok Freighter S", "Ving Defender" });
         }
 
         void CreateTestEnv(out Empire empire, out Ship ship)

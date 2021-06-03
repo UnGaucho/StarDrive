@@ -134,8 +134,7 @@ namespace Ship_Game.Ships.Components.CarrierBays
             for (int i = 0; i < AllFighterHangars.Length; i++)
             {
                 var hangar = AllFighterHangars[i];
-                if (hangar.hangarShipUID == "DynamicLaunch" || hangar.hangarShipUID.IsEmpty())
-                    Log.Error("fail");
+
                 HangarTemplates[i] = ResourceManager.GetShipTemplate(hangar.hangarShipUID);
             }
 

@@ -127,8 +127,9 @@ namespace Ship_Game.Ships.Components.CarrierBays
         /// </summary>
         public void UpdateHangerShipsUID()
         {
-            if (!HasActiveHangars || !PrepShipHangars(Owner.loyalty, overrideCache: true)) return;
-
+            if (!HasActiveHangars || AllFighterHangars.Length == 0 || !PrepShipHangars(Owner.loyalty, overrideCache: true))
+                return;
+            
             // Now do some stuff to calculate some basics
             Ship[] HangarTemplates = new Ship[AllFighterHangars.Length];
             for (int i = 0; i < AllFighterHangars.Length; i++)
@@ -579,6 +580,7 @@ namespace Ship_Game.Ships.Components.CarrierBays
 
                     // If the ship we want cant be built, will try to launch the best we have by proceeding this method as if the hangar is dynamic
                     string selectedShip = GetDynamicShipName(hangar, empire);
+
                     hangar.hangarShipUID = selectedShip;
                     if (hangar.hangarShipUID.IsEmpty())
                     {
@@ -587,7 +589,7 @@ namespace Ship_Game.Ships.Components.CarrierBays
                         else
                             hangar.hangarShipUID = defaultShip;
                     }
-                     
+
                     //if (Empire.Universe?.Debug == true)
                     //    Log.Info($"Chosen ship for Hangar launch: {hangar.hangarShipUID}");
                 }

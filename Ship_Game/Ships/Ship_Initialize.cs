@@ -455,7 +455,7 @@ namespace Ship_Game.Ships
             {
                 InitConstantsAfterUpdate(fromSave);
             }
-
+            Carrier.UpdateHangerShipsUID();
             UpdateWeaponRanges();
             CurrentStrength = CalculateShipStrength();
 
@@ -556,8 +556,6 @@ namespace Ship_Game.Ships
             }
 
             UpdateShields();
-
-            Carrier.UpdateHangerShipsUID();
 
             if (shipData.Role == ShipData.RoleName.troop)
                 TroopCapacity = 1; // set troopship and assault shuttle not to have 0 TroopCapacity since they have no modules with TroopCapacity

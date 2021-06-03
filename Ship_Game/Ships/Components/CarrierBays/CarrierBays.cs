@@ -140,8 +140,8 @@ namespace Ship_Game.Ships.Components.CarrierBays
             }
 
             // these are purposefully inefficient for clarity.
-            AllFightersCanWarp = HangarTemplates.Min(t => t.Modules.Any(m=> m.WarpThrust > 0));
-            TotalFighterDPS = HangarTemplates.Max(t => t.CalculateShipStrength());
+            AllFightersCanWarp = HangarTemplates.Min(t => t.MaxFTLSpeed > 0);
+            TotalFighterDPS = HangarTemplates.Sum(t => t.GetStrength());
 
         }
 

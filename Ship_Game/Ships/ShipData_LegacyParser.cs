@@ -107,21 +107,7 @@ namespace Ship_Game.Ships
                 // @todo Remove conversion to HashSet
                 ship.TechsNeeded = new HashSet<string>();
                 for (int i = 0; i < s->TechsLen; ++i)
-                {
-                    string uid = s->Techs[i].AsInterned;
-
-                    if (ResourceManager.TryGetTech(uid, out Technology technology))
-                    {
-                        foreach(var techType in technology.TechnologyTypes)
-                        {
-                            if (techType.ToString().Contains("ship"))
-                            {
-                                ship.TechsNeeded.Add(uid);
-                                break;
-                            }
-                        }
-                    }
-                }
+                    ship.TechsNeeded.Add(s->Techs[i].AsInterned);
 
                 ship.FinalizeAfterLoad(info, isHullDefinition);
                 return ship;

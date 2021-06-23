@@ -205,7 +205,9 @@ namespace Ship_Game.Debug
 
         public override void Draw(SpriteBatch batch, DrawTimes elapsed)
         {
-            //Page?.Draw(batch, elapsed);
+            // this isnt needed for all pages. Need to check again but pretty sure that one of the pages wont draw without this.
+            // should be fixed and removed. 
+            Page?.Draw(batch, elapsed);
 
             try
             {

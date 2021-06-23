@@ -284,7 +284,7 @@ namespace Ship_Game
                     case "ADVANCE":  types.Add(TechnologyType.ShipGeneral);  break;
                 }
 
-                // these hacks... just breaking stuff
+                // this we need to look at why these were causing an issue and how to do that better. 
                 switch (unlockedBonus.BonusType ?? unlockedBonus.Name)
                 {
                     case "Xeno Compilers":

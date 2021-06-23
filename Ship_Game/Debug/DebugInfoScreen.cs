@@ -205,7 +205,7 @@ namespace Ship_Game.Debug
 
         public override void Draw(SpriteBatch batch, DrawTimes elapsed)
         {
-            Page?.Draw(batch, elapsed);
+            //Page?.Draw(batch, elapsed);
 
             try
             {

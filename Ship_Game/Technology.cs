@@ -284,6 +284,7 @@ namespace Ship_Game
                     case "ADVANCE":  types.Add(TechnologyType.ShipGeneral);  break;
                 }
 
+                // these hacks... just breaking stuff
                 switch (unlockedBonus.BonusType ?? unlockedBonus.Name)
                 {
                     case "Xeno Compilers":
@@ -306,15 +307,16 @@ namespace Ship_Game
                     case "Consumption Bonus":
                     case "Tax Bonus":
                     case "Maintenance Bonus":
-                        types.Add(TechnologyType.Economic); break;
-                    /* FB - Do not force more types, it derails research and slows down the AI.
+                        types.Add(TechnologyType.Economic); break; 
+                    //FB - Do not force more types, it derails research and slows down the AI.
+                    // not properly marking the techs break things.
                     case "Top Guns":
                     case "Bonus Fighter Levels":
                     case "Mass Reduction":
                     case "Percent Mass Adjustment":
                     case "STL Speed Bonus":
                     case "ArmourMass":
-                        types.Add(TechnologyType.ShipGeneral); break;*/
+                        types.Add(TechnologyType.ShipGeneral); break;
                     case "Resistance is Futile":
                     case "Super Soldiers":
                     case "Troop Strength Modifier Bonus":

@@ -64,7 +64,7 @@ namespace Ship_Game
         public int MaxLevel => Tech.MaxLevel;
 
         [XmlIgnore][JsonIgnore]
-        readonly Dictionary<TechnologyType, float> TechTypeCostLookAhead = new Dictionary<TechnologyType, float>();
+        readonly Map<TechnologyType, float> TechTypeCostLookAhead = new Map<TechnologyType, float>();
 
         public static readonly TechEntry None = new TechEntry("");
 
@@ -151,9 +151,26 @@ namespace Ship_Game
             return !ContainsNonShipTechOrBonus();
         }
 
+        public bool IsPrimaryTechForType(TechnologyType techType) => Tech.TechnologyTypes.First() == techType;
+        public bool IsPrimaryShipTech() => IsTechTypeShipTech(Tech.TechnologyTypes.First());
+
         public bool IsOnlyNonShipTech()
         {
             return !ContainsShipTech();
+        }
+
+        bool IsTechTypeShipTech(TechnologyType techType)
+        {
+            switch (techType)
+            {
+                case TechnologyType.ShipHull:
+                case TechnologyType.ShipDefense:
+                case TechnologyType.ShipWeapons:
+                case TechnologyType.ShipGeneral:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         public bool ContainsShipTech()

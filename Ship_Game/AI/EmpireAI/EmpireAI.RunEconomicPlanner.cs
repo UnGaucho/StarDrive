@@ -189,14 +189,14 @@ namespace Ship_Game.AI
 
         public float TreasuryGoal(float normalizedMoney)
         {
-            //gremlin: Use self adjusting tax rate based on wanted treasury of 10(1 full years) of total income.
-            float treasuryGoal = Math.Max(OwnerEmpire.PotentialIncome, 0)
-                                 + OwnerEmpire.data.FlatMoneyBonus;
-            
-            float timeSpan = (200 - normalizedMoney / 500).Clamped(100,200) * OwnerEmpire.data.treasuryGoal;
-            treasuryGoal *= timeSpan;
+            //gremlin: Use self adjusting tax rate based on wanted treasury of 10(1 full years) of possible savings.
 
-            return treasuryGoal.LowerBound(Empire.StartingMoney);
+            //The national savings rate (S) is the difference between income (I) and consumption (C), divided by income: S = (I - C) / I. 
+            float savings = OwnerEmpire.NetIncomePotential;
+            float timeSpan = 200 * OwnerEmpire.data.treasuryGoal; // ten game years modified by treasury goal percent. 
+            savings *= timeSpan;
+
+            return savings.LowerBound(Empire.StartingMoney);
         }
 
         /// <summary>

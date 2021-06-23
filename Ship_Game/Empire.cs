@@ -225,6 +225,11 @@ namespace Ship_Game
         // Income this turn before deducting ship maintenance
         public float GrossIncome              => GrossPlanetIncome + TotalTradeMoneyAddedThisTurn + ExcessGoodsMoneyAddedThisTurn + data.FlatMoneyBonus;
         public float NetIncome                => GrossIncome - AllSpending;
+        public float GrossIncomePotential     => Math.Max(PotentialIncome, 0) + data.FlatMoneyBonus + TotalAvgTradeIncome + ExcessGoodsMoneyAddedThisTurn;
+        public float NetIncomePotential       => GrossIncomePotential - AllSpending;
+        //The national savings rate (S) is the difference between income (I) and consumption (C), divided by income: S = (I - C) / I. 
+        public float SavingsRate              => NetIncome / GrossIncome;
+        public float PotentialSavingsRate     => NetIncomePotential / GrossIncomePotential;
         public float TotalBuildingMaintenance =>  GrossPlanetIncome - (NetPlanetIncomes + TroopCostOnPlanets);
         public float BuildingAndShipMaint     => TotalBuildingMaintenance + TotalShipMaintenance;
         public float AllSpending              => BuildingAndShipMaint + MoneySpendOnProductionThisTurn + TroopCostOnPlanets;

@@ -1847,26 +1847,17 @@ namespace Ship_Game.Ships
         public override string ToString() =>
             $"Ship Id={Id} '{ShipName}' Pos {Position} {System} Loyalty {loyalty} Role {DesignRole} State {AI?.State}" ;
 
-        public bool ShipIsGoodForGoals(float baseStrengthNeeded = 0, Empire empire = null)
+        public bool ShipIsGoodForGoals(float baseStrengthNeeded = 0, Empire empire = null, Status statusNeeded = Status.Excellent)
         {
             if (!Active) return false;
             empire = empire ?? loyalty;
 
-            //bool goodWarp = rangeStatus >= Status.Excellent;
-            //float goodPowerSupply = PowerFlowMax - NetPower.NetWarpPowerDraw;
-            //float powerTime = GlobalStats.MinimumWarpRange;
-            //if (goodPowerSupply < 0)
-            //    powerTime = PowerStoreMax / -goodPowerSupply * MaxFTLSpeed;
-
-            //bool warpTimeGood = goodPowerSupply >= 0 || powerTime >= GlobalStats.MinimumWarpRange;
-            //if (!warpTimeGood || empire == null)
-            
             Status rangeStatus = Status.Critical;
             if (empire != null)
             {
                  rangeStatus= WarpRangeStatus(GlobalStats.MinimumWarpRange);
             }
-            bool warpTimeGood = rangeStatus >= Status.Excellent;
+            bool warpTimeGood = rangeStatus >= statusNeeded;
             if (!warpTimeGood)
                 Empire.Universe?.DebugWin?.DebugLogText(
                     $"WARNING ship design {Name} with hull {shipData.Hull} :{rangeStatus} WarpTime. {NetPower.NetWarpPowerDraw}/{PowerFlowMax}",
@@ -1886,13 +1877,13 @@ namespace Ship_Game.Ships
             }
         }
 
-        public bool ShipGoodToBuild(Empire empire)
+        public bool ShipGoodToBuild(Empire empire, Status neededStatus = Status.Excellent)
         {
             if (IsPlatformOrStation || shipData.CarrierShip)
                 return true;
 
             NetPower = Power.Calculate(ModuleSlotList, empire);
-            return ShipIsGoodForGoals(0f, empire);
+            return ShipIsGoodForGoals(0f, empire, neededStatus);
         }
 
         public Status ToShipStatus(float valueToCheck, float maxValue)

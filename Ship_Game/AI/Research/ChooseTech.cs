@@ -342,30 +342,66 @@ namespace Ship_Game.AI.Research
 
             DebugLog($"\nFind : {techType.ToString()}");
             bool wantsShipTech = techType.ToString().Contains("Ship");
+            bool generalTechs = techType == TechnologyType.GroundCombat || techType == TechnologyType.General;
 
             TechEntry[] techsTypeFiltered = availableTechs.Filter(tech =>
             {
-                if (!wantsShipTech && tech.IsOnlyShipTech())
+                // do a tight comparison for ships
+                if (wantsShipTech && !tech.IsPrimaryTechForType(techType))
+                    return false;
+                // dont use primary ship techs for normal techs. 
+                if (!wantsShipTech && tech.IsPrimaryShipTech())
+                    return false;
+                // do a loose check for tech type. 
+                if (!tech.IsTechnologyType(techType))
                     return false;
 
-                if (wantsShipTech && tech.IsOnlyNonShipTech())
+                // verify that the tech has a cost. filters out techs that cant be researched
+                if (CostToResearchTechType(tech, techType) <= 0)
                     return false;
 
-                if (CostToResearchTechType(tech, techType) >0)
-                    return true;
-
-                return false;
+                return true;
             });
 
-            if (techsTypeFiltered.Length == 0 && !wantsShipTech
-                && (GlobalStats.HasMod && GlobalStats.ActiveModInfo.EnableShipTechLineFocusing))
+            if (techsTypeFiltered.Length == 0)
             {
-                //this get lookahead is tricky.
-                //Its trying here to see if the current tech with the wrong techType has a future tech with the right one.
-                //otherwise it would be a simple tech matches techType formula.
-                techsTypeFiltered = availableTechs.Filter(tech =>
-                    tech.CostOfNextTechWithType(techType) > 0);
+                // if not techs found do a looser check. 
+                // does the tech have any of the wanted types. 
+                // if not do any future techs have teh wanted type
 
+
+                if (wantsShipTech && LineFocus.BestCombatShip != null)
+                {
+                    techsTypeFiltered = availableTechs.Filter(tech =>
+                        {
+                            foreach (var shipTech in LineFocus.BestCombatShip.shipData.TechsNeeded)
+                            {
+                                bool foundTech = tech.Tech.Name == shipTech;
+                                if (foundTech && tech.IsTechnologyType(techType))
+                                    return true;
+                            }
+                            return false;
+                        });
+                }
+                else
+                {
+                    techsTypeFiltered = availableTechs.Filter(tech =>
+                {
+
+                    {
+
+                        if (!tech.IsTechnologyType(techType) && tech.CostOfNextTechWithType(techType) <= 0)
+                            return false;
+                        if (tech.IsPrimaryShipTech())
+                            return false;
+
+                        if (CostToResearchTechType(tech, techType) <= 0)
+                            return false;
+                    }
+
+                    return true;
+                });
+                }
             }
             LogPossibleTechs(techsTypeFiltered, techType);
             TechEntry researchTech = TechWithWantedCost(command1, techsTypeFiltered, techType);

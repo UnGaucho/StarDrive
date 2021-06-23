@@ -465,23 +465,24 @@ namespace Ship_Game.AI.Research
         private HashSet<string> UseBestShipTechs(HashSet<string> shipTechs, HashSet<string> nonShipTechs)
         {
             // Match researchable techs to techs ship needs.
-            if (OwnerEmpire.ShipsWeCanBuild.Contains(BestCombatShip.Name))
-            {
+            if (OwnerEmpire.ShipsWeCanBuild.Contains(BestCombatShip?.Name)) 
                 BestCombatShip = null;
-            }
-            
-            var bestShipTechs = shipTechs.Intersect(BestCombatShip.shipData.TechsNeeded);
-            if (!bestShipTechs.Any())
+
+            if (BestCombatShip != null)
             {
-                var bestNoneShipTechs = nonShipTechs.Intersect(BestCombatShip.shipData.TechsNeeded);
-                if (!bestNoneShipTechs.Any())
+                var bestShipTechs = shipTechs.Intersect(BestCombatShip.shipData.TechsNeeded);
+                if (!bestShipTechs.Any())
                 {
-                    BestCombatShip = null;
-                    return UseOnlyWantedShipTechs(shipTechs, nonShipTechs);
+                    var bestNoneShipTechs = nonShipTechs.Intersect(BestCombatShip.shipData.TechsNeeded);
+                    if (!bestNoneShipTechs.Any())
+                        BestCombatShip = null;
+                    else
+                        Log.Warning($"ship tech classified as non ship tech {bestNoneShipTechs.First()} for {BestCombatShip}");
                 }
-                Log.Warning($"ship tech classified as non ship tech {bestNoneShipTechs.First()} for {BestCombatShip}");
             }
-            return UseOnlyWantedShipTechs(bestShipTechs, nonShipTechs);
+            if (BestCombatShip != null)
+                return UseOnlyWantedShipTechs(BestCombatShip.shipData.TechsNeeded, nonShipTechs);
+            return UseOnlyWantedShipTechs(shipTechs, nonShipTechs);
         }
 
         private HashSet<string> UseResearchableShipTechs(Array<Ship> researchableShips, HashSet<string> shipTechs, HashSet<string> nonShipTechs)

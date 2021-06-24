@@ -368,8 +368,6 @@ namespace Ship_Game.AI.Research
                 // if not techs found do a looser check. 
                 // does the tech have any of the wanted types. 
                 // if not do any future techs have teh wanted type
-
-
                 if (wantsShipTech && LineFocus.BestCombatShip != null)
                 {
                     techsTypeFiltered = availableTechs.Filter(tech =>

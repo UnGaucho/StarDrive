@@ -479,9 +479,9 @@ namespace Ship_Game.AI.Research
                     else
                         Log.Warning($"ship tech classified as non ship tech {bestNoneShipTechs.First()} for {BestCombatShip}");
                 }
+                if (BestCombatShip != null)
+                    return UseOnlyWantedShipTechs(bestShipTechs, nonShipTechs);
             }
-            if (BestCombatShip != null)
-                return UseOnlyWantedShipTechs(BestCombatShip.shipData.TechsNeeded, nonShipTechs);
             return UseOnlyWantedShipTechs(shipTechs, nonShipTechs);
         }
 

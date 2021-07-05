@@ -69,11 +69,17 @@ namespace UnitTests
         public Empire Faction { get; private set; }
 
         public FixedSimTime TestSimStep { get; private set; } = new FixedSimTime(1f / 60f);
+        public VariableFrameTime TestVarTime { get; private set; } = new VariableFrameTime(1f / 60f);
 
         public StarDriveTest()
         {
-            Log.Initialize();
+            GlobalStats.LoadConfig();
+            Log.Initialize(enableSentry: false);
             Log.VerboseLogging = true;
+
+            // This allows us to completely load UniverseScreen inside UnitTests
+            GlobalStats.DrawStarfield = false;
+            GlobalStats.DrawNebulas = false;
         }
 
         static void Cleanup()
@@ -92,6 +98,9 @@ namespace UnitTests
         public void CreateGameInstance(int width=800, int height=600,
                                        bool show=false, bool mockInput=true)
         {
+            if (Game != null)
+                throw new InvalidOperationException("Game instance already created");
+
             // Try to collect all memory before we continue, otherwise we can run out of memory
             // in the unit tests because it doesn't collect memory by default
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
@@ -108,10 +117,7 @@ namespace UnitTests
 
         public void Dispose()
         {
-            Empire.Universe?.ExitScreen();
-            Empire.Universe?.Dispose();
-            Empire.Universe = Universe = null;
-
+            DestroyUniverse();
             Game?.Dispose();
             Game = null;
             Cleanup();
@@ -129,47 +135,68 @@ namespace UnitTests
                 throw new Exception($"LoadStarterContent() or LoadStarterShips() must be called BEFORE {functionName}() !");
         }
 
-        public void CreateUniverseAndPlayerEmpire(out Empire player)
+        public void CreateUniverseAndPlayerEmpire()
         {
             RequireGameInstance(nameof(CreateUniverseAndPlayerEmpire));
             RequireStarterContentLoaded(nameof(CreateUniverseAndPlayerEmpire));
 
             var data = new UniverseData();
-            Player = player = data.CreateEmpire(ResourceManager.MajorRaces[0], isPlayer:true);
-            Empire.Universe = Universe = new UniverseScreen(data, player);
-            Universe.player = player;
+            Player = data.CreateEmpire(ResourceManager.MajorRaces[0], isPlayer:true);
+            Empire.Universe = Universe = new UniverseScreen(data, Player);
             Enemy = EmpireManager.CreateRebelsFromEmpireData(ResourceManager.MajorRaces[0], Player);
-            player.TestInitModifiers();
+            Player.TestInitModifiers();
         }
 
-        public void LoadStarterContent()
+        public void CreateDeveloperSandboxUniverse(string playerPreference, int numOpponents, bool paused)
         {
-            RequireGameInstance(nameof(LoadStarterContent));
-            ResourceManager.LoadBasicContentForTesting();
+            var data = DeveloperUniverse.Create(playerPreference, numOpponents);
+            SetUniverse(new DeveloperUniverse(data, data.EmpireList.First, paused));
+        }
+
+        public void SetUniverse(UniverseScreen us)
+        {
+            Empire.Universe = Universe = us;
+            Player = EmpireManager.Player;
+            Enemy  = EmpireManager.NonPlayerEmpires[0];
+        }
+
+        public void DestroyUniverse()
+        {
+            Empire.Universe?.ExitScreen();
+            Empire.Universe?.Dispose();
+            Empire.Universe = Universe = null;
+        }
+
+        public void LoadGameContent(ResourceManager.TestOptions options = ResourceManager.TestOptions.None)
+        {
+            RequireGameInstance(nameof(LoadGameContent));
+            ResourceManager.LoadContentForTesting(options);
         }
 
         public void LoadStarterShips(params string[] shipList)
         {
+            LoadStarterShips(ResourceManager.TestOptions.None, shipList);
+        }
+
+        public void LoadStarterShips(ResourceManager.TestOptions options, params string[] shipList)
+        {
             RequireGameInstance(nameof(LoadStarterShips));
             if (shipList == null)
                 throw new NullReferenceException(nameof(shipList));
-            ResourceManager.LoadStarterShipsForTesting(shipList.Length == 0 ? null : shipList);
+            ResourceManager.LoadStarterShipsForTesting(shipsList:shipList.Length == 0 ? null : shipList,
+                                                       savedDesigns:null, options);
         }
 
-        public void LoadStarterShips(string[] starterShips, string[] savedDesigns)
+        public void LoadStarterShips(string[] starterShips, string[] savedDesigns,
+                                     ResourceManager.TestOptions options = ResourceManager.TestOptions.None)
         {
             RequireGameInstance(nameof(LoadStarterShips));
-            ResourceManager.LoadStarterShipsForTesting(starterShips, savedDesigns);
+            ResourceManager.LoadStarterShipsForTesting(starterShips, savedDesigns, options);
         }
 
-        public void LoadStarterShipVulcan()
+        public void LoadStarterShipVulcan(ResourceManager.TestOptions options = ResourceManager.TestOptions.None)
         {
-            LoadStarterShips(new[]
-            {
-                "Vulcan Scout",
-                "Rocket Scout",
-                "Laserclaw"
-            });
+            LoadStarterShips(options, "Vulcan Scout", "Rocket Scout", "Laserclaw");
         }
         
         public Ship SpawnShip(string shipName, Empire empire, Vector2 position, Vector2 shipDirection = default)

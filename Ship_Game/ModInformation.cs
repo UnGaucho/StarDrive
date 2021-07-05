@@ -48,9 +48,11 @@ namespace Ship_Game
         public float SpaceportScale = 0.8f;
 
         // added by Fat Bastard
-        public bool UseResearchableShipTechs; // Use short term researchable techs with no best ship
+        public bool EnableShipTechLineFocusing; // Use short term researchable techs with no best ship
+        public bool DisableShipPicker; // Disable the ship picker and use all techs that can be researched based on ship designs
 
-
+        // How tougher are remnant designs in the mod. This affects starting fleet multipliers and also increases with difficulty. Vanilla is 2
+        public float RemnantDesignStrMultiplier; 
 
         public string SupportedBlackBoxVersions;
 

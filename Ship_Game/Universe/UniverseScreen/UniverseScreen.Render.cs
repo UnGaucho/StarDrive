@@ -10,41 +10,26 @@ namespace Ship_Game
 {
     public partial class UniverseScreen
     {
-        private void RenderParticles()
-        {
-            beamflashes             .SetCamera(View, Projection);
-            explosionParticles      .SetCamera(View, Projection);
-            photonExplosionParticles.SetCamera(View, Projection);
-            explosionSmokeParticles .SetCamera(View, Projection);
-            projectileTrailParticles.SetCamera(View, Projection);
-            fireTrailParticles      .SetCamera(View, Projection);
-            smokePlumeParticles     .SetCamera(View, Projection);
-            fireParticles           .SetCamera(View, Projection);
-            engineTrailParticles    .SetCamera(View, Projection);
-            flameParticles          .SetCamera(View, Projection);
-            SmallflameParticles     .SetCamera(View, Projection);
-            sparks                  .SetCamera(View, Projection);
-            lightning               .SetCamera(View, Projection);
-            flash                   .SetCamera(View, Projection);
-            star_particles          .SetCamera(View, Projection);
-            neb_particles           .SetCamera(View, Projection);
-        }
-
         Map<PlanetGlow, SubTexture> Glows;
+
+        public void DrawStarField()
+        {
+            if (GlobalStats.DrawStarfield)
+                bg.Draw(this);
+        }
 
         void RenderBackdrop(SpriteBatch batch)
         {
             DrawBackdropPerf.Start();
 
-            if (GlobalStats.DrawStarfield)
-                bg.Draw(this, StarField);
+            DrawStarField();
 
             if (GlobalStats.DrawNebulas)
-               bg3d.Draw();
+                bg3d?.Draw();
 
             batch.Begin();
 
-            UpdateKnownShipsScreenState();
+            UpdateClickableShips();
 
             lock (GlobalStats.ClickableSystemsLock)
             {
@@ -102,41 +87,26 @@ namespace Ship_Game
             DrawBackdropPerf.Stop();
         }
 
-        void UpdateKnownShipsScreenState()
+        void UpdateClickableShips()
         {
-            var viewport = new Rectangle(0, 0, ScreenWidth, ScreenHeight);
-
             ClickableShipsList.Clear();
+            Ship[] ships = Objects.VisibleShips;
 
-            using (player.KnownShips.AcquireReadLock())
+            for (int i = 0; i < ships.Length; i++)
             {
-                for (int i = 0; i < player.KnownShips.Count; i++)
+                Ship ship = ships[i];
+                if ((viewState == UnivScreenState.GalaxyView && ship.IsPlatform))
+                    continue;
+
+                ProjectToScreenCoords(ship.Position, ship.Radius,
+                    out Vector2 shipScreenPos, out float screenRadius);
+
+                ClickableShipsList.Add(new ClickableShip
                 {
-                    Ship ship = player.KnownShips[i];
-                    if (ship == null || !ship.Active ||
-                        (viewState == UnivScreenState.GalaxyView && ship.IsPlatform))
-                        continue;
-
-                    ProjectToScreenCoords(ship.Position, ship.Radius,
-                        out Vector2 shipScreenPos, out float screenRadius);
-
-                    if (viewport.HitTest(shipScreenPos))
-                    {
-                        if (screenRadius < 7.0f) screenRadius = 7f;
-                        ship.ScreenRadius = screenRadius;
-                        ship.ScreenPosition = shipScreenPos;
-                        ClickableShipsList.Add(new ClickableShip
-                        {
-                            Radius = screenRadius,
-                            ScreenPos = shipScreenPos,
-                            shipToClick = ship
-                        });
-                    }
-                    else
-                    {
-                        ship.ScreenPosition = new Vector2(-1f, -1f);
-                    }
-                }
+                    Radius = screenRadius < 7f ? 7f : screenRadius,
+                    ScreenPos = shipScreenPos,
+                    shipToClick = ship
+                });
             }
         }
 
@@ -202,9 +172,10 @@ namespace Ship_Game
         }
 
         // @todo This is unused??? Maybe some legacy code?
+        // I think this draws a big galaxy texture
         void RenderGalaxyBackdrop()
         {
-            bg.DrawGalaxyBackdrop(this, StarField);
+            bg.DrawGalaxyBackdrop(this);
             ScreenManager.SpriteBatch.Begin();
             for (int index = 0; index < 41; ++index)
             {
@@ -517,20 +488,20 @@ namespace Ship_Game
                 vector2.X -= SolarsystemOverlay.SysFont.MeasureString(solarSystem.Name).X / 2f;
         }
 
-
-        private void RenderThrusters()
+        void RenderThrusters()
         {
             if (viewState > UnivScreenState.ShipView)
                 return;
-            using (player.KnownShips.AcquireReadLock())
-                for (int i = 0; i < player.KnownShips.Count; ++i)
+
+            Ship[] ships = Objects.VisibleShips;
+            for (int i = 0; i < ships.Length; ++i)
+            {
+                Ship ship = ships[i];
+                if (ship.InSensorRange)
                 {
-                    Ship ship = player.KnownShips[i];
-                    if (ship != null && ship.InFrustum && ship.inSensorRange)
-                    {
-                        ship.RenderThrusters(ref View, ref Projection);
-                    }
+                    ship.RenderThrusters(ref View, ref Projection);
                 }
+            }
         }
 
         public void DrawZones(Graphics.Font font, string text, ref int cursorY, Color color)
@@ -686,45 +657,13 @@ namespace Ship_Game
             if (viewState < UnivScreenState.SectorView)
             {
                 RenderThrusters();
-                RenderParticles();
                 DrawWarpFlash();
-
-                beamflashes.Draw();
-                explosionParticles.Draw();
-                photonExplosionParticles.Draw();
-                explosionSmokeParticles.Draw();
-                projectileTrailParticles.Draw();
-                fireTrailParticles.Draw();
-                smokePlumeParticles.Draw();
-                fireParticles.Draw();
-                engineTrailParticles.Draw();
-                star_particles.Draw();
-                neb_particles.Draw();
-                flameParticles.Draw();
-                SmallflameParticles.Draw();
-                sparks.Draw();
-                lightning.Draw();
-                flash.Draw();
+                Particles.Draw(View, Projection);
             }
 
             if (!Paused) // Particle pools need to be updated
             {
-                beamflashes.Update(elapsed);
-                explosionParticles.Update(elapsed);
-                photonExplosionParticles.Update(elapsed);
-                explosionSmokeParticles.Update(elapsed);
-                projectileTrailParticles.Update(elapsed);
-                fireTrailParticles.Update(elapsed);
-                smokePlumeParticles.Update(elapsed);
-                fireParticles.Update(elapsed);
-                engineTrailParticles.Update(elapsed);
-                star_particles.Update(elapsed);
-                neb_particles.Update(elapsed);
-                flameParticles.Update(elapsed);
-                SmallflameParticles.Update(elapsed);
-                sparks.Update(elapsed);
-                lightning.Update(elapsed);
-                flash.Update(elapsed);
+                Particles.Update(elapsed);
             }
 
             DrawParticles.Stop();

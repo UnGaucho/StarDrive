@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Ship_Game.Empires;
 using Ship_Game.Gameplay;
 
 namespace Ship_Game.Ships
@@ -11,19 +12,12 @@ namespace Ship_Game.Ships
         // This is an optimized lookup system, because these properties are queried every frame
         bool InOwnerInfluence;
         float OwnerInfluenceTimer = -100;
-        const float InfluenceTimerBuffer = 0.017f;
         
         struct ForeignInfluence
         {
             public Empire Foreign;
             public Relationship Relationship; // our relation with this foreign empire
             public float Timer;
-            public ForeignInfluence(float defaultTimer)
-            {
-                Foreign = null;
-                Relationship = null;
-                Timer = defaultTimer;
-            }
         }
 
         int InfluenceCount;
@@ -40,15 +34,16 @@ namespace Ship_Game.Ships
         void UpdateInfluence(FixedSimTime timeStep)
         {
             OwnerInfluenceTimer -= timeStep.FixedTime;
-            InOwnerInfluence     = OwnerInfluenceTimer + InfluenceTimerBuffer > 0;
+            InOwnerInfluence = OwnerInfluenceTimer > 0;
             
-            if (InfluenceCount < 1) return;
+            if (InfluenceCount < 1)
+                return;
 
             for (int i = 0; i < InfluenceCount; i++)
             {
                 ref ForeignInfluence influence = ref Influences[i];
                 influence.Timer -= timeStep.FixedTime;
-                if (influence.Foreign != null && influence.Timer + InfluenceTimerBuffer < 0)
+                if (influence.Foreign != null && influence.Timer < 0)
                 {
                     int last = --InfluenceCount;
                     Influences[i] = Influences[last];
@@ -63,7 +58,7 @@ namespace Ship_Game.Ships
             if (empire == loyalty)
             {
                 InOwnerInfluence    = isInsideInfluence;
-                OwnerInfluenceTimer = loyalty.MaxContactTimer;
+                OwnerInfluenceTimer = EmpireConstants.InfluenceEffectTime;
             }
             else if (isInsideInfluence) // set foreign influence (may already exist)
             {
@@ -72,24 +67,24 @@ namespace Ship_Game.Ships
                     ref ForeignInfluence influence = ref Influences[index];
                     if (influence.Foreign == empire) // it's already set?
                     {
-                        influence.Timer = empire.MaxContactTimer;
+                        influence.Timer = EmpireConstants.InfluenceEffectTime;
                         return;
                     }
                 }
 
-                var relation =loyalty.GetRelations(empire);
+                Relationship relation = loyalty.GetRelations(empire);
                 if (relation == null) 
                     return;
 
                 if (Influences == null)
-                    Influences = new ForeignInfluence[4];
+                    Influences = new ForeignInfluence[2];
                 else if (Influences.Length == InfluenceCount)
                     Array.Resize(ref Influences, Influences.Length*2);
 
                 ref ForeignInfluence dst = ref Influences[InfluenceCount++];
-                dst.Foreign              = empire;
-                dst.Relationship         = relation;
-                dst.Timer                = empire.MaxContactTimer;
+                dst.Foreign      = empire;
+                dst.Relationship = relation;
+                dst.Timer        = EmpireConstants.InfluenceEffectTime;
             }
         }
 
@@ -97,7 +92,7 @@ namespace Ship_Game.Ships
         {
             if (empire == loyalty) return InOwnerInfluence;
 
-            return Influences?.Any(i=> i.Foreign == empire && i.Timer + InfluenceTimerBuffer > 0) ?? false;
+            return Influences?.Any(i=> i.Foreign == empire && i.Timer > 0) ?? false;
         }
 
         public IEnumerable<Empire> GetProjectorInfluenceEmpires()
@@ -106,7 +101,7 @@ namespace Ship_Game.Ships
                 yield return loyalty;
             for (int i = 0; i < InfluenceCount; ++i)
             {
-                if (Influences[i].Timer + InfluenceTimerBuffer > 0)
+                if (Influences[i].Timer > 0)
                     yield return Influences[i].Foreign;
             }
         }
@@ -121,7 +116,7 @@ namespace Ship_Game.Ships
                 for (int i = 0; i < InfluenceCount; ++i)
                 {
                     ref ForeignInfluence influence = ref Influences[i];
-                    if (influence.Timer + InfluenceTimerBuffer > 0)
+                    if (influence.Timer > 0)
                     {
                         Relationship r = influence.Relationship;
                         if (r?.Treaty_Alliance == true || r?.Treaty_Trade == true && IsFreighter)
@@ -142,7 +137,7 @@ namespace Ship_Game.Ships
                 for (int i = 0; i < InfluenceCount; ++i)
                 {
                     ref ForeignInfluence influence = ref Influences[i];
-                    if (influence.Timer + InfluenceTimerBuffer > 0 )
+                    if (influence.Timer > 0 )
                         if (influence.Relationship?.AtWar == true)
                             return true;
 

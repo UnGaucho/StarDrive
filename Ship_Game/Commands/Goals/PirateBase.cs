@@ -48,20 +48,18 @@ namespace Ship_Game.Commands.Goals
             }
 
             Base.ChangeOrdnance(Base.OrdinanceMax / 10); // Slowly replenish the base's ordnance stores
-            var friendlies = Base.AI.FriendliesNearby;
-            using (friendlies.AcquireReadLock())
-            {
-                for (int i = 0; i < friendlies.Count; i++)
-                {
-                    Ship ship = friendlies[i];
-                    if (ship.IsPlatformOrStation || ship.IsHangarShip)
-                        continue; // Do not mess with our own structures
 
-                    if (ship.InRadius(Base.Center, Base.Radius + 3000))
-                    {
-                        ship.ChangeOrdnance(ship.OrdinanceMax / 10);
-                        Pirates.ProcessShip(ship, Base);
-                    }
+            Ship[] friendlies = Base.AI.FriendliesNearby;
+            for (int i = 0; i < friendlies.Length; i++)
+            {
+                Ship ship = friendlies[i];
+                if (ship.IsPlatformOrStation || ship.IsHangarShip)
+                    continue; // Do not mess with our own structures
+
+                if (ship.InRadius(Base.Center, Base.Radius + 3000))
+                {
+                    ship.ChangeOrdnance(ship.OrdinanceMax / 10);
+                    Pirates.ProcessShip(ship, Base);
                 }
             }
 

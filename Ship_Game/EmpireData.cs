@@ -1,9 +1,12 @@
 using System;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Xml.Serialization;
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using Ship_Game.Gameplay;
+using Ship_Game.Ships;
 
 namespace Ship_Game
 {
@@ -221,7 +224,7 @@ namespace Ship_Game
         // economy
         [Serialize(71)] public float SSPBudget     = 0;
         [Serialize(72)] public float SpyBudget     = 0;
-        [Serialize(73)] public float ShipBudget    = 0;
+        [Serialize(73)] public float FreightBudget    = 0;
         [Serialize(74)] public float ColonyBudget  = 0;
         [Serialize(75)] public float DefenseBudget = 0;
 
@@ -290,7 +293,7 @@ namespace Ship_Game
         [Serialize(126)] public bool IsPirateFaction;
         [Serialize(127)] public int PiratePaymentPeriodTurns = 100; 
         [Serialize(128)] public int MinimumColoniesForStartPayment = 3;
-        [Serialize(129)] public Array<float> NormalizedMilitaryScore;
+        [Serialize(129)] public float MilitaryScoreAverage;
 
         // FB - For Remnants
         [Serialize(130)] public bool IsRemnantFaction;
@@ -313,6 +316,7 @@ namespace Ship_Game
         [Serialize(146)] public string SpacePortModel;
         [Serialize(147)] public float BombEnvironmentDamageMultiplier = 1;
         [Serialize(148)] public float OngoingDiplomaticModifier;
+        [Serialize(149)] public int[] RoleLevels = new int[Enum.GetNames(typeof(ShipData.RoleName)).Length];
 
         [XmlIgnore][JsonIgnore] public string Name => Traits.Name;
         [XmlIgnore][JsonIgnore] public string ArchetypeName => PortraitName;
@@ -360,14 +364,14 @@ namespace Ship_Game
         [XmlIgnore] [JsonIgnore] public float EnvPerfBarren  => EnvBarren;
         [XmlIgnore] [JsonIgnore] public PlanetCategory PreferredEnvPlanet => PreferredEnv;
 
-        public string ShipType  => Traits.ShipType;
-        public string VideoPath => Traits.VideoPath;
-        public string Singular => Traits.Singular;
-        public string Plural   => Traits.Plural;
-        public string HomeSystemName => Traits.HomeSystemName;
-        public string HomeWorldName  => Traits.HomeworldName;
-        public string Adj1 => Traits.Adj1;
-        public string Adj2 => Traits.Adj2;
+        [XmlIgnore] [JsonIgnore] public string ShipType  => Traits.ShipType;
+        [XmlIgnore] [JsonIgnore] public string VideoPath => Traits.VideoPath;
+        [XmlIgnore] [JsonIgnore] public string Singular => Traits.Singular;
+        [XmlIgnore] [JsonIgnore] public string Plural   => Traits.Plural;
+        [XmlIgnore] [JsonIgnore] public string HomeSystemName => Traits.HomeSystemName;
+        [XmlIgnore] [JsonIgnore] public string HomeWorldName  => Traits.HomeworldName;
+        [XmlIgnore] [JsonIgnore] public string Adj1 => Traits.Adj1;
+        [XmlIgnore] [JsonIgnore] public string Adj2 => Traits.Adj2;
 
         public EmpireData()
         {
@@ -427,12 +431,11 @@ namespace Ship_Game
 
         public float NormalizeMilitaryScore(float currentStr)
         {
-            int maxItems = 10;
-            if (NormalizedMilitaryScore.Count == maxItems)
-                NormalizedMilitaryScore.RemoveAt(0);
-
-            NormalizedMilitaryScore.Add(currentStr / 1000);
-            return NormalizedMilitaryScore.Sum() / NormalizedMilitaryScore.Count;
+            // exponential moving average
+            float newRatio = 0.1f;
+            float score = currentStr / 1000;
+            MilitaryScoreAverage = MilitaryScoreAverage*(1f-newRatio) + score*newRatio;
+            return MilitaryScoreAverage;
         }
     }
 } 

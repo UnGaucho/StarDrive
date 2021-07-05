@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Ship_Game.Commands.Goals;
+using Ship_Game.Debug;
 using Ship_Game.GameScreens.DiplomacyScreen;
 
 // ReSharper disable once CheckNamespace
@@ -15,13 +16,13 @@ namespace Ship_Game.AI
     public sealed partial class EmpireAI
     {
         private int NumberOfShipGoals  = 6;
-        private int NumberTroopGoals   = 2;
         public float BuildCapacity { get; private set; }
+        public float AvailableBuildCapacity => BuildCapacity - OwnerEmpire.TotalWarShipMaintenance - OwnerEmpire.TotalTroopShipMaintenance;
+        public float CivShipBudget => OwnerEmpire.data.FreightBudget;
+        public float AvailableCivShipBudget => OwnerEmpire.data.FreightBudget - OwnerEmpire.TotalCivShipMaintenance;
         public float AllianceBuildCapacity { get; private set; }
-        public float TroopShuttleCapacity { get; private set; }
 
         private readonly Empire OwnerEmpire;
-        private readonly BatchRemovalCollection<SolarSystem> MarkedForExploration = new BatchRemovalCollection<SolarSystem>();
         public readonly OffensiveForcePoolManager OffensiveForcePoolManager;
 
         public string EmpireName;
@@ -30,12 +31,8 @@ namespace Ship_Game.AI
         public ThreatMatrix ThreatMatrix;                     
         public Array<AO> AreasOfOperations                   = new Array<AO>();
         public Array<int> UsedFleets                         = new Array<int>();
-        public float Toughnuts = 0;
-        public int Recyclepool = 0;
         public float DefStr;
         public ExpansionAI.ExpansionPlanner ExpansionAI;
-
-        public int PauseWarTimer { get; set; } = -10;
 
         public EmpireAI(Empire e, bool fromSave)
         {
@@ -55,9 +52,6 @@ namespace Ship_Game.AI
 
             if (OwnerEmpire.isFaction && OwnerEmpire.data.IsRemnantFaction)
                 OwnerEmpire.SetAsRemnants(fromSave, Goals);
-
-            EmpireDefense?.RestoreFromSave(true);
-            WarTasks = new StrategyAI.WarGoals.WarTasks(e);
         }
 
         void RunManagers()
@@ -80,8 +74,29 @@ namespace Ship_Game.AI
                 RunDiplomaticPlanner();
                 RunResearchPlanner();
                 RunAgentManager();
+                if (Empire.Universe?.Debug == true && Empire.Universe?.StarDate % 50 == 0)
+                {
+                    int techScore     = 0;
+                    int totalStrength = 0;
+                    int maxStrength   = 0;
+                    int maxTechScore  = 0;
+                    Log.Write($"------- ship list -----{Empire.Universe?.StarDate} Ship list for {OwnerEmpire.Name}");
+                    foreach (var logit in OwnerEmpire.ShipsWeCanBuild)
+                    {
+                        var template = ResourceManager.GetShipTemplate(logit, false);
+                        Log.Write(ConsoleColor.Green ,$"{template.BaseHull.Role}, {template.DesignRole}, '{logit}'");
+                        int strength   = (int)template.GetStrength();
+                        techScore     += template.shipData.TechsNeeded.Count;
+                        totalStrength += strength;
+                        maxStrength    = Math.Max(maxStrength, strength);
+                        maxTechScore   = Math.Max(maxTechScore, techScore);
+                    }
+                    Log.Write($"ShipTechCount= {techScore} MaxShipTechs={maxTechScore} MaxShipStrength= {maxStrength}");
+                    Log.Write($"PlanetBudget= {OwnerEmpire.data.ColonyBudget:0.0}/{OwnerEmpire.TotalBuildingMaintenance:0.0} Population= {OwnerEmpire.TotalPopBillion:0.0} Planets= {OwnerEmpire.NumPlanets}");
+                    Log.Write($"------- ship list -----{Empire.Universe?.StarDate} Ship list for {OwnerEmpire.Name}");
+                }
             }
-            WarTasks.Update();
+
             RunMilitaryPlanner();
             RunWarPlanner();
         }
@@ -271,6 +286,18 @@ namespace Ship_Game.AI
                 Goals.Add(new RearmShipFromPlanet(ship, existingSupplyShip, p, OwnerEmpire));
         }
 
+        public void CancelColonization(Planet p)
+        {
+            Goal goal = Goals.Find(g => g.type == GoalType.Colonize && g.ColonizationTarget == p);
+            if (goal != null)
+            {
+                goal.FinishedShip?.AI.OrderOrbitNearest(true);
+                goal.PlanetBuildingAt?.Construction.Cancel(goal);
+                Goals.QueuePendingRemoval(goal);
+                Goals.ApplyPendingRemovals();
+            }
+        }
+
         public void Update()
         {
             DefStr = DefensiveCoordinator.GetForcePoolStrength();
@@ -322,7 +349,6 @@ namespace Ship_Game.AI
             Goals.Add(goal);
         }
 
-        
         public void FindAndRemoveGoal(GoalType type, Predicate<Goal> removeIf)
         {
             for (int i = 0; i < Goals.Count; ++i)
@@ -333,6 +359,19 @@ namespace Ship_Game.AI
                     Goals.QueuePendingRemoval(g);
                     return;
                 }
+            }
+        }
+
+        public void DebugDrawTasks(ref DebugTextBlock debug, Empire enemy, bool warTasks)
+        {
+            var prioritizedTasks = TaskList.Sorted(t => t.Priority);
+            for (int i = 0; i < prioritizedTasks.Length; i++)
+            {
+                MilitaryTask task = prioritizedTasks[i];
+                if (warTasks && (!task.IsWarTask || task.TargetEmpire != enemy))
+                    continue;
+
+                task.DebugDraw(ref debug);
             }
         }
     }

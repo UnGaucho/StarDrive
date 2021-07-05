@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using Ship_Game.AI;
+﻿using Ship_Game.AI;
 using Ship_Game.Ships;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Ship_Game
 {
@@ -9,10 +9,10 @@ namespace Ship_Game
     {
         public void RefreshBuildingsWeCanBuildHere()
         {
-            if (Owner == null) 
+            if (Owner == null)
                 return;
 
-            BuildingsCanBuild.Clear();
+            var canBuild = new Array<Building>();
 
             // See if it already has a command building or not.
             bool needCommandBuilding = BuildingList.All(b => !b.IsCapitalOrOutpost);
@@ -43,11 +43,12 @@ namespace Ship_Game
                 if (b.BuildOnlyOnce && IsBuiltOrQueuedWithinEmpire(b))
                     continue;
                 // Terraformer Limit check
-                if (b.IsTerraformer && TerraformersHere + ConstructionQueue.Count(i => i.isBuilding && i.Building.IsTerraformer) >= TerraformerLimit)
+                if (b.IsTerraformer && (!Terraformable || TerraformersHere + ConstructionQueue.Count(i => i.isBuilding && i.Building.IsTerraformer) >= TerraformerLimit))
                     continue;
                 // If the building is still a candidate after all that, then add it to the list!
-                BuildingsCanBuild.Add(b);
+                canBuild.Add(b);
             }
+            BuildingsCanBuild = canBuild;
         }
 
         public bool IsBuiltOrQueuedWithinEmpire(Building b)
@@ -88,20 +89,36 @@ namespace Ship_Game
         public bool BuildingBuiltOrQueued(Building b) => BuildingBuilt(b.BID) || BuildingInQueue(b.BID);
         public bool BuildingBuiltOrQueued(int bid) => BuildingBuilt(bid) || BuildingInQueue(bid);
 
-        public int TurnsUntilQueueCompleted(float extraItemCost = 0)
+        public int TurnsUntilQueueCompleted(float extraItemCost = 0, float priority = 1.00f)
         {
             float totalProdNeeded = TotalProdNeededInQueue() + extraItemCost;
             if (totalProdNeeded.AlmostZero())
                 return 0;
 
+            priority = priority.Clamped(0, 1);
+
+            // issue in this calculation is that we dont know the future of the production stores.
+            // we assume we will have all of it for the build queue but that is unpredictable as it can
+            // also be exporting that production and then these calculation would not apply.
+            // for the purposes of calculating the best planet to build on
+            // it could be changed to just totalProdNeeded / Prod.NetMaxPotential which would give
+            // a reliable baseline that isnt dependent on the unknown future of the production stores.
+
+            // max production useable per turn when we have production stored.
             float maxProductionWithInfra    = MaxProductionToQueue.LowerBound(0.01f);
+            // turns to use all stored production with just infra
             float turnsWithInfra            = ProdHere / InfraStructure.LowerBound(0.01f);
-            float totalProdWithInfra        = turnsWithInfra * maxProductionWithInfra;
+            // modify the number of turns that can use all production.
+            float prioritizedTurns          = turnsWithInfra * priority;
+            // turns in queue using just infra * max production that can be added per turn with stores.
+            float totalProdWithInfra        = prioritizedTurns * maxProductionWithInfra;
+            // how much is left to build after all production is gone.
             float prodNeededAfterStorageEnd = totalProdNeeded - totalProdWithInfra;
 
-            if (prodNeededAfterStorageEnd.LessOrEqual(0)) // we can produce all queue with max prod and storage
+            if (prodNeededAfterStorageEnd <=0) // we can produce all queue with max prod and storage
                 return (int)(totalProdNeeded / maxProductionWithInfra);
 
+            // there is no more production stored. How long to build without it.
             float potentialProduction = Prod.NetMaxPotential.LowerBound(0.01f);
             float turnsWithoutInfra   = prodNeededAfterStorageEnd / potentialProduction;
 
@@ -110,14 +127,14 @@ namespace Ship_Game
 
         // @return Total numbers before ship will be finished if
         //         inserted to the end of the queue.
-        public int TurnsUntilQueueComplete(float cost, bool forTroop)
+        public int TurnsUntilQueueComplete(float cost, bool forTroop, float priority)
         {
-            if (!forTroop && !HasSpacePort || forTroop && !CanBuildInfantry)
+            if (!forTroop && !HasSpacePort || forTroop && (!CanBuildInfantry || ConstructionQueue.Count(q => q.isTroop) >= 2))
                 return 9999; // impossible
 
             float effectiveCost = forTroop ? cost : (cost * ShipBuildingModifier).LowerBound(0);
             effectiveCost      += TotalShipCostInRefitGoals();
-            int total           = TurnsUntilQueueCompleted(effectiveCost); // FB - this is just an estimation
+            int total           = TurnsUntilQueueCompleted(effectiveCost, priority); // FB - this is just an estimation
             return total.UpperBound(9999);
         }
 

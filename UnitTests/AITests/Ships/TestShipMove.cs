@@ -17,10 +17,6 @@ namespace UnitTests.AITests.Ships
             LoadStarterShipVulcan();
         }
 
-        void CreateTestEnv()
-        {
-            CreateUniverseAndPlayerEmpire(out _);
-        }
         Ship CreateTestShip()
         {
             Ship ship = SpawnShip("Vulcan Scout", Player, Vector2.Zero);
@@ -42,14 +38,20 @@ namespace UnitTests.AITests.Ships
             {
                 update();
                 if (sw.Elapsed.TotalSeconds > 5.0)
-                    throw new TimeoutException($"Timed out while waiting for engine state change");
+                    throw new TimeoutException("Timed out while waiting for engine state change");
             }
+        }
+
+        void DoManualSensorScan(Ship s, FixedSimTime time)
+        {
+            s.AI.ScanForTargets(time);
+            s.AI.Update(time);
         }
 
         [TestMethod]
         public void MoveShip()
         {
-            CreateTestEnv();
+            CreateUniverseAndPlayerEmpire();
             
             var enemySpawnLocation = new Vector2(30000, 0);
             var movePosition       = new Vector2(60000, 0);
@@ -64,7 +66,7 @@ namespace UnitTests.AITests.Ships
             // wait for ship to enter warp
             WaitForEngineChangeTo(Ship.MoveState.Warp, ship, () =>
             {
-                ship.AI.DoManualSensorScan(new FixedSimTime(10f));
+                DoManualSensorScan(ship, new FixedSimTime(10f));
                 ship.Update(TestSimStep);
             });
 
@@ -74,8 +76,8 @@ namespace UnitTests.AITests.Ships
             WaitForEngineChangeTo(Ship.MoveState.Sublight, ship, () =>
             {
                 Universe.Objects.Update(TestSimStep); // update ships
-                ship.AI.DoManualSensorScan(new FixedSimTime(10f));
-                enemy.AI.DoManualSensorScan(new FixedSimTime(10f));
+                DoManualSensorScan(ship, new FixedSimTime(10f));
+                DoManualSensorScan(enemy, new FixedSimTime(10f));
                 sawEnemyShip |= ship.AI.BadGuysNear;
             });
             Assert.IsTrue(sawEnemyShip, "Did not see an enemy while at warp");
@@ -98,9 +100,9 @@ namespace UnitTests.AITests.Ships
             // wait for ship to exit warp
             WaitForEngineChangeTo(Ship.MoveState.Sublight, ship, () =>
             {
-                Universe.Objects.Update(TestSimStep); // update ships           
-                ship.AI.StartSensorScan(new FixedSimTime(10f));
-                enemy.AI.StartSensorScan(new FixedSimTime(10f));
+                Universe.Objects.Update(TestSimStep); // update ships
+                ship.AI.ScanForTargets(TestSimStep);
+                enemy.AI.ScanForTargets(TestSimStep);
                 sawEnemyShip |= ship.AI.BadGuysNear;
             });
 

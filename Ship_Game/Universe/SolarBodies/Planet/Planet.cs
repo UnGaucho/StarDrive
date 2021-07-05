@@ -6,6 +6,7 @@ using Ship_Game.Universe.SolarBodies;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Ship_Game.Spatial;
 
 namespace Ship_Game
 {
@@ -155,9 +156,9 @@ namespace Ship_Game
         float PotentialMaxPopFor(Empire empire, bool forceOnlyBiospheres = false)
         {
             bool bioSpheresResearched = empire.IsBuildingUnlocked(Building.BiospheresId);
-            bool terraformResearched  = empire.IsBuildingUnlocked(Building.TerraformerId);
+            bool terraformResearched  = empire.CanFullTerraformPlanets;
 
-            // We calculate this  and not using MaxPop since it might be an enemy planet with biospheres
+            // We calculate this and not using MaxPop since it might be an enemy planet with biospheres
             int numNaturalHabitableTiles = TilesList.Count(t => t.Habitable && !t.Biosphere);
             float racialEnvModifier      = Empire.RacialEnvModifer(Category, empire);
             float naturalMaxPop          = BasePopPerTile * numNaturalHabitableTiles * racialEnvModifier;
@@ -196,8 +197,8 @@ namespace Ship_Game
 
         public float PotentialMaxFertilityFor(Empire empire)
         {
-            float minimumMaxFertilityPotential = empire.IsBuildingUnlocked(Building.TerraformerId) ? 1 : 0;
-                return MaxFertilityFor(empire).LowerBound(minimumMaxFertilityPotential);
+            float minimumMaxFertilityPotential = empire.CanFullTerraformPlanets ? 1 : 0;
+            return MaxFertilityFor(empire).LowerBound(minimumMaxFertilityPotential);
         }
 
         public float MaxPopulationFor(Empire empire)
@@ -372,31 +373,16 @@ namespace Ship_Game
             return GravityWellRadius;
         }
 
-        public float ColonyWorthTo(Empire empire)
+        // this is calculating colonyRawValue twice.
+        public float ColonyDiplomaticValueTo(Empire empire)
         {
-            float worth = PopulationBillion + MaxPopulationBillionFor(empire);
+            float worth = ColonyBaseValue(empire) + ColonyRawValue(empire);
             if (empire.NonCybernetic)
-            {
                 worth += (FoodHere / 50f) + (ProdHere / 50f);
-                worth += FertilityFor(empire)*1.5f;
-                worth += MineralRichness;
-            }
-            else // filthy Opteris
-            {
+            else 
                 worth += (ProdHere / 25f);
-                worth += MineralRichness*2.0f;
-            }
 
-            foreach (Building b in BuildingList)
-                worth += b.ActualCost / 50f;
-
-            if (worth < 15f)
-                worth = 15f;
-
-            if (empire.data.EconomicPersonality.Name == "Expansionists")
-                worth *= 1.35f;
-
-            return worth;
+            return worth.LowerBound(15);
         }
 
         public void SetInGroundCombat(Empire empire, bool notify = false)
@@ -426,7 +412,7 @@ namespace Ship_Game
             float value = 0;
             value += SpecialCommodities * 10;
             value += EmpireFertility(empire) * 10;
-            value += MineralRichness * 10;
+            value += MineralRichness * (empire.IsCybernetic ? 20 : 10);
             value += MaxPopulationBillionFor(empire) * 5;
             return value;
         }
@@ -454,7 +440,7 @@ namespace Ship_Game
                 if (empire.NonCybernetic 
                     && HabitablePercentage < 0.25f
                     && empire.IsBuildingUnlocked(Building.BiospheresId)
-                    && !empire.IsBuildingUnlocked(Building.TerraformerId))
+                    && !empire.CanFullTerraformPlanets)
                 {
                     multiplier = 2.5f; // Avoid crappy barren planets unless they have really large pop potential
                 }
@@ -466,7 +452,8 @@ namespace Ship_Game
         public float ColonyWarValueTo(Empire empire)
         {
             if (Owner == null)             return ColonyPotentialValue(empire);
-            if (Owner.IsAtWarWith(empire)) return ColonyWorthTo(empire);
+            if (Owner.IsAtWarWith(empire)) return ColonyBaseValue(empire) + ColonyPotentialValue(empire);
+
             return 0;
         }
 
@@ -505,7 +492,7 @@ namespace Ship_Game
                 return;
 
             PlanetUpdatePerTurnTimer -= timeStep.FixedTime;
-            if (PlanetUpdatePerTurnTimer < 0 )
+            if (PlanetUpdatePerTurnTimer < 0)
             {
                 UpdateBaseFertility();
                 UpdateDynamicBuildings();
@@ -549,22 +536,25 @@ namespace Ship_Game
             }
 
             bool enemyInRange = ParentSystem.DangerousForcesPresent(Owner);
-            if (NoSpaceCombatTargetsFoundDelay.Less(2) || enemyInRange)
+            if (NoSpaceCombatTargetsFoundDelay < 2f || enemyInRange)
             {
                 bool targetNear = false;
                 NoSpaceCombatTargetsFoundDelay -= timeStep.FixedTime;
+
                 for (int i = 0; i < BuildingList.Count; ++i)
                 {
                     Building building = BuildingList[i];
-                    bool targetFound  = false;
-                    building?.UpdateSpaceCombatActions(timeStep, this, out targetFound);
-                    targetNear |= targetFound;
+                    if (building != null)
+                    {
+                        bool targetFound = building.UpdateSpaceCombatActions(timeStep, this);
+                        targetNear |= targetFound;
+                    }
                 }
 
                 SpaceCombatNearPlanet |= targetNear;
                 if (!targetNear && NoSpaceCombatTargetsFoundDelay <= 0)
                 {
-                    SpaceCombatNearPlanet          = ThreatsNearPlanet(enemyInRange);
+                    SpaceCombatNearPlanet = ThreatsNearPlanet(enemyInRange);
                     NoSpaceCombatTargetsFoundDelay = 2f;
                 }
             }
@@ -592,24 +582,31 @@ namespace Ship_Game
 
         public Ship ScanForSpaceCombatTargets(float weaponRange) // @todo FB - need to work on this
         {
+            // don't do this expensive scan if there are no hostiles
+            if (!ParentSystem.HostileForcesPresent(Owner))
+                return null;
+
             weaponRange = weaponRange.UpperBound(SensorRange);
-            float closestTroop = weaponRange;
-            float closestShip = weaponRange;
+            float closestTroop = weaponRange*weaponRange;
+            float closestShip = weaponRange*weaponRange;
             Ship troop = null;
             Ship closest = null;
 
-            GameplayObject[] enemyShips = UniverseScreen.Spatial.FindNearby(GameObjectType.Ship,
-                                                 Center, weaponRange, maxResults:64, excludeLoyalty:Owner);
+            var opt = new SearchOptions(Center, weaponRange, GameObjectType.Ship)
+            {
+                MaxResults = 32,
+                ExcludeLoyalty = Owner,
+            };
+            GameplayObject[] enemyShips = UniverseScreen.Spatial.FindNearby(ref opt);
 
             for (int j = 0; j < enemyShips.Length; ++j)
             {
                 var ship = (Ship)enemyShips[j];
-                if (!ship.Active || ship.dying || ship.IsInWarp || !Owner.IsEmpireAttackable(ship.loyalty))
+                if (ship.dying || ship.IsInWarp || !Owner.IsEmpireAttackable(ship.loyalty))
                     continue;
 
-                float dist = Center.Distance(ship.Center);
-                if ((ship.shipData.Role == ShipData.RoleName.troop 
-                     || ship.DesignRole == ShipData.RoleName.bomber) && dist < closestTroop)
+                float dist = Center.SqDist(ship.Center);
+                if (dist < closestTroop && (ship.IsTroopShip || ship.IsBomber))
                 {
                     closestTroop = dist;
                     troop = ship;
@@ -672,6 +669,7 @@ namespace Ship_Game
                 RemoveBuildingFromPlanet(b);
 
             ProdHere += b.ActualCost / 2f;
+            Owner.GetEmpireAI().MaintSavedByBuildingScrappedThisTurn += b.Maintenance;
         }
 
         public void DestroyBuildingOn(PlanetGridSquare tile)
@@ -1160,7 +1158,7 @@ namespace Ship_Game
                 if (ship.IsMeteor)
                     CrashMeteor(ship, crashTile);
                 else
-                    crashTile.CrashSite.CrashShip(ship.loyalty, ship.Name, troopName, numTroopsSurvived, this, crashTile);
+                    crashTile.CrashSite.CrashShip(ship.loyalty, ship.Name, troopName, numTroopsSurvived, this, crashTile, ship.SurfaceArea);
             }
 
             // Local Functions

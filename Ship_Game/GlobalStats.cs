@@ -77,6 +77,8 @@ namespace Ship_Game
 
         public static float StartingPlanetRichness;
         public static int IconSize;
+
+        // Time in seconds for a single turn
         public static int TurnTimer = 5;
 
         public static bool PreventFederations;
@@ -87,6 +89,7 @@ namespace Ship_Game
         public static bool DisableAsteroids;
         public static bool FixedPlayerCreditCharge;
         public static bool NotifyEnemyInSystemAfterLoad = true;
+        public static bool EnableEngineTrails = true;
 
         public static int AutoSaveFreq = 300;   //Added by Gretman
         public static ExtraRemnantPresence ExtraRemnantGS;
@@ -111,7 +114,6 @@ namespace Ship_Game
         // Dev Options
         public static bool RestrictAIPlayerInteraction;
         public static bool DisableAIEmpires;
-        public static bool EnableSaveExportButton = true;
 
         ////////////////////////////////
         // From old Config
@@ -305,9 +307,9 @@ namespace Ship_Game
             GetSetting("AltArcControl",        ref AltArcControl);
             GetSetting("LimitSpeed",           ref LimitSpeed);
             GetSetting("DisableAsteroids",     ref DisableAsteroids);
+            GetSetting("EnableEngineTrails",   ref EnableEngineTrails);
             GetSetting("SimulationFramesPerSecond", ref SimulationFramesPerSecond);
             GetSetting("NotifyEnemyInSystemAfterLoad", ref NotifyEnemyInSystemAfterLoad);
-            GetSetting("NotifyEnemyInSystemAfterLoad", ref EnableSaveExportButton);
         }
 
         public static void SaveSettings()
@@ -345,7 +347,7 @@ namespace Ship_Game
             WriteSetting(config, "AltArcControl",       AltArcControl);
             WriteSetting(config, "LimitSpeed",          LimitSpeed);
             WriteSetting(config, "DisableAsteroids",    DisableAsteroids);
-            WriteSetting(config, "DisableAsteroids",    EnableSaveExportButton);
+            WriteSetting(config, "EnableEngineTrails",  EnableEngineTrails);
             WriteSetting(config, "SimulationFramesPerSecond", SimulationFramesPerSecond);
             WriteSetting(config, "NotifyEnemyInSystemAfterLoad", NotifyEnemyInSystemAfterLoad);
 

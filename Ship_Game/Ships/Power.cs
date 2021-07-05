@@ -1,4 +1,6 @@
-﻿namespace Ship_Game.Ships
+﻿using System;
+
+namespace Ship_Game.Ships
 {
     public struct Power
     {
@@ -44,8 +46,10 @@
             float subLightPowerDraw      = shieldPowerDraw + nonShieldPowerDraw;
             float warpPowerDrainModifier = empire.data.FTLPowerDrainModifier;
             float warpPowerDraw          = (shieldPowerDraw + nonShieldPowerDraw) * warpPowerDrainModifier + (warpPowerDrawBonus * warpPowerDrainModifier / 2);
-            float subLightPowerDuration  = PowerDuration(powerFlowMax, subLightPowerDraw);
-            float warpPowerDuration      = PowerDuration(powerFlowMax, warpPowerDraw);
+            float subLightPowerDuration  = PowerDuration(powerFlowMax, subLightPowerDraw, powerStoreMax);
+            float warpPowerDuration      = PowerDuration(powerFlowMax, warpPowerDraw, powerStoreMax);
+            // calculate after maxes
+
             return new Power
             {
                 NetSubLightPowerDraw  = subLightPowerDraw,
@@ -56,21 +60,30 @@
                 PowerStoreMax         = powerStoreMax
             };
         }
-        public static float PowerDuration(float powerFlowMax, float powerDraw)
-        {
-            powerDraw = powerDraw.LowerBound(1);
-            float powerRatio = (powerFlowMax / powerDraw).Clamped(.01f, 1f);
-            if (powerRatio < 1)
-                return powerFlowMax * powerRatio;
 
-            return float.MaxValue;
-        }
-        public float PowerDuration(Ship.MoveState moveState)
+        /// <summary>
+        /// Returns the number of updates of power available.
+        /// </summary>
+        public static float PowerDuration(float powerFlowMax, float powerDraw, float powerStore)
         {
+            float duration = float.MaxValue;
+            float netPower = powerFlowMax - powerDraw;
+            netPower *= -1;
+            if (netPower > 0) 
+                duration = powerStore / netPower;
+            return duration;
+        }
+
+        /// <summary>
+        /// Returns the numbers of updates of power depending on the move state.
+        /// </summary>
+        public float PowerDuration(Ship.MoveState moveState, float currentPower)
+        {
+            float powerSupplyRatio = currentPower / PowerStoreMax;
             switch (moveState)
             {
-                case Ship.MoveState.Warp: return WarpPowerDuration;
-                default:                  return SubLightPowerDuration;
+                case Ship.MoveState.Warp: return WarpPowerDuration * powerSupplyRatio;
+                default:                  return SubLightPowerDuration * powerSupplyRatio;
             }
         }
     }

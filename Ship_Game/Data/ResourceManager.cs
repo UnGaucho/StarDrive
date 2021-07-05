@@ -196,6 +196,16 @@ namespace Ship_Game
             else
                 GlobalStats.ClearActiveMod();
 
+            LoadContent();
+            Profiled(TestLoad);
+            Profiled(RunExportTasks);
+
+            LoadGraphicsResources(manager);
+            HelperFunctions.CollectMemory();
+        }
+
+        static void LoadContent()
+        {
             InitContentDir();
             CreateCoreGfxResources();
             Log.Write($"Load {(GlobalStats.HasMod ? ModContentDirectory : "Vanilla")}");
@@ -227,12 +237,6 @@ namespace Ship_Game
             Profiled(LoadBuildRatios);
             Profiled(LoadEcoResearchStrats);
             Profiled(LoadBlackboxSpecific);
-
-            Profiled(TestLoad);
-            Profiled(RunExportTasks);
-
-            LoadGraphicsResources(manager);
-            HelperFunctions.CollectMemory();
         }
 
         public static void LoadGraphicsResources(ScreenManager manager)
@@ -250,7 +254,8 @@ namespace Ship_Game
             Profiled(LoadAsteroids);
             Profiled(LoadProjTexts);
             Profiled(LoadProjectileMeshes);
-            Profiled(SunType.LoadSunTypes); // Hotspot #3 174.8ms  7.91%
+            Profiled("LoadParticles", ParticleSettings.LoadAll);
+            Profiled("LoadSunTypes", () => SunType.LoadSunTypes()); // Hotspot #3 174.8ms  7.91%
             Profiled("LoadBeamFX", () =>
             {
                 ShieldManager.LoadContent(RootContent);
@@ -300,6 +305,7 @@ namespace Ship_Game
             ProjectileModelDict.Clear();
             ProjectileMeshDict.Clear();
 
+            ParticleSettings.Unload();
             SunType.Unload();
             ShieldManager.UnloadContent();
             Beam.BeamEffect = null;
@@ -554,11 +560,6 @@ namespace Ship_Game
             return LoadEntities<T>(GatherFilesUnified(dir, "xml"), id);
         }
 
-        static Array<T> LoadVanillaEntities<T>(string dir, string id) where T : class
-        {
-            return LoadEntities<T>(Dir.GetFiles("Content/" + dir, "xml"), id);
-        }
-
         static Array<T> LoadModEntities<T>(string dir, string id) where T : class
         {
             return LoadEntities<T>(Dir.GetFiles(ModContentDirectory + dir, "xml"), id);
@@ -711,10 +712,10 @@ namespace Ship_Game
 
         //////////////////////////////////////////////////////////////////////////////////////////
 
-        static void CreateCoreGfxResources()
+        public static void CreateCoreGfxResources()
         {
             WhitePixel = new Texture2D(RootContent.Device, 1, 1, 1, TextureUsage.None, SurfaceFormat.Color);
-            WhitePixel.SetData(new Color[]{ Color.White });
+            WhitePixel.SetData(new []{ Color.White });
         }
 
         public static SubTexture ErrorTexture   => TextureOrNull("NewUI/x_red");
@@ -1065,9 +1066,14 @@ namespace Ship_Game
         }
 
         static TextureAtlas FlagTextures;
-        public static SubTexture Flag(int index) => FlagTextures[index];
-        public static SubTexture Flag(Empire e) => FlagTextures[e.data.Traits.FlagIndex];
-        public static int NumFlags => FlagTextures.Count;
+        
+        public static SubTexture Flag(int index) =>
+            FlagTextures != null && FlagTextures.TryGetTexture(index, out SubTexture t) ? t : null;
+        
+        public static SubTexture Flag(Empire e) => Flag(e.data.Traits.FlagIndex);
+        
+        public static int NumFlags => FlagTextures?.Count ?? 0;
+        
         static void LoadFlagTextures() // Refactored by RedFox
         {
             FlagTextures = LoadAtlas("Flags");
@@ -1155,6 +1161,8 @@ namespace Ship_Game
         static Array<TextureBinding> BigNebulae = new Array<TextureBinding>();
         static Array<TextureBinding> MedNebulae = new Array<TextureBinding>();
         static Array<TextureBinding> SmallNebulae = new Array<TextureBinding>();
+
+        public static bool HasLoadedNebulae => Nebulae != null && Nebulae.Count > 0;
 
         // Refactored by RedFox
         static void LoadNebulae()
@@ -1320,6 +1328,7 @@ namespace Ship_Game
         static readonly Array<ShipData> HullsList       = new Array<ShipData>();
         static readonly Map<string, ShipHull> NewHulls = new Map<string, ShipHull>();
 
+        public static bool NewHull(string shipHull, out ShipHull hull) => NewHulls.Get(shipHull, out hull);
         public static bool Hull(string shipHull, out ShipData hullData) => HullsDict.Get(shipHull, out hullData);
         public static IReadOnlyList<ShipData> Hulls                     => HullsList;
 
@@ -1559,16 +1568,31 @@ namespace Ship_Game
             LoadShipTemplates(designs.Values.ToArray());
         }
 
+        [Flags]
+        public enum TestOptions
+        {
+            None = 0,
+            LoadEverything = (1 << 1), // rare: load pretty much all game content
+            LoadPlanets = (1 << 2),
+            TechContent = (1 << 3),
+            AllStarterShips = (1 << 4),
+        }
+
         // @note This is used for Unit Tests and is not part of the core game
         // @param shipsList Only load these ships to make loading faster.
         //                  Example:  shipsList: new [] { "Vulcan Scout" }
         public static void LoadStarterShipsForTesting(string[] shipsList = null,
-                                                      string[] savedDesigns = null)
+                                                      string[] savedDesigns = null,
+                                                      TestOptions options = TestOptions.None)
         {
-            LoadBasicContentForTesting();
+            LoadContentForTesting(options);
+            if (options.HasFlag(TestOptions.LoadEverything))
+                return; // all ships already loaded
 
             var ships = new Array<FileInfo>();
-            if (shipsList != null)
+            if (options.HasFlag(TestOptions.AllStarterShips))
+                ships.AddRange(GatherFilesUnified("StarterShips", "xml"));
+            else if (shipsList != null)
                 ships.AddRange(shipsList.Select(ship => GetModOrVanillaFile($"StarterShips/{ship}.xml")));
             if (savedDesigns != null)
                 ships.AddRange(savedDesigns.Select(ship => GetModOrVanillaFile($"SavedDesigns/{ship}.xml")));
@@ -1579,8 +1603,17 @@ namespace Ship_Game
             LoadShipTemplates(designs.Values.ToArray());
         }
 
-        public static void LoadBasicContentForTesting()
+        public static void LoadContentForTesting(TestOptions options = TestOptions.None)
         {
+            if (options.HasFlag(TestOptions.LoadEverything))
+            {
+                LoadContent();
+                ParticleSettings.LoadAll();
+                SunType.LoadSunTypes(enableHotLoading: false);
+                Fonts.LoadFonts(RootContent, Localizer.Language);
+                return;
+            }
+
             InitContentDir();
             LoadWeapons();
             LoadHullData();
@@ -1591,23 +1624,35 @@ namespace Ship_Game
             LoadEmpires();
             LoadEcoResearchStrats();
             LoadBuildings();
+
+            bool loadPlanets = options.HasFlag(TestOptions.LoadPlanets);
+            bool loadTechs = options.HasFlag(TestOptions.TechContent);
+
+            if (loadPlanets)
+            {
+                LoadPlanetTypes();
+                LoadSunZoneData();
+                LoadBuildRatios();
+            }
+            if (loadTechs)
+            {
+                LoadTechTree();
+                TechValidator();
+            }
+            if (loadPlanets || loadTechs)
+            {
+                SunType.LoadSunTypes(enableHotLoading: false);
+            }
         }
 
         public static void LoadPlanetContentForTesting()
         {
-            LoadBasicContentForTesting();
-            LoadPlanetTypes();
-            LoadSunZoneData();
-            LoadBuildRatios();
-            SunType.LoadSunTypes();
+            LoadContentForTesting(TestOptions.LoadPlanets);
         }
 
         public static void LoadTechContentForTesting()
         {
-            LoadBasicContentForTesting();
-            LoadTechTree();
-            TechValidator();
-            SunType.LoadSunTypes();
+            LoadContentForTesting(TestOptions.TechContent);
         }
 
         static void TechValidator()

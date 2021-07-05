@@ -238,7 +238,7 @@ namespace Ship_Game
             DrawPlanetStats(PopPerTileRect, $"{popPerTile.String(0)}m", "NewUI/icon_poppertile", Color.White, Color.White);
             DrawPlanetStats(BiospheredPopRect, biospherePop.String(1), "NewUI/icon_biospheres", Color.White, Color.White);
 
-            if (EmpireManager.Player.IsBuildingUnlocked(Building.TerraformerId))
+            if (EmpireManager.Player.CanFullTerraformPlanets)
             {
                 float terraformedPop = P.PotentialMaxPopBillionsFor(EmpireManager.Player);
                 DrawPlanetStats(TerraformedPopRect, terraformedPop.String(1),
@@ -377,11 +377,11 @@ namespace Ship_Game
             ToolTipItems.Add(new TippedItem(TerraformedPopRect, GameText.ThisIndicatesWhatWouldThe2));
         }
 
-        void DrawPlanetStats(Rectangle rect, string data, string texturePath, Color color, Color texcolor)
+        void DrawPlanetStats(Rectangle rect, string data, string texturePath, Color color, Color texColor)
         {
             Graphics.Font font = Fonts.Arial12Bold;
             Vector2 pos     = new Vector2((rect.X + rect.Width + 2), (rect.Y + 11 - font.LineSpacing / 2));
-            ScreenManager.SpriteBatch.Draw(ResourceManager.Texture(texturePath), rect, texcolor);
+            ScreenManager.SpriteBatch.Draw(ResourceManager.Texture(texturePath), rect, texColor);
             ScreenManager.SpriteBatch.DrawString(Fonts.Arial12Bold, data, pos, color);
         }
 
@@ -398,21 +398,10 @@ namespace Ship_Game
             }
             if (P.Owner == null && MarkedRect.HitTest(input.CursorPosition) && input.InGameSelect)
             {
-                bool marked = false;
-                Goal markedGoal = null;
-                foreach (Goal g in EmpireManager.Player.GetEmpireAI().Goals)
+                if (EmpireManager.Player.GetEmpireAI().Goals.Any(g => g.type == GoalType.Colonize && g.ColonizationTarget == P))
                 {
-                    if (g.ColonizationTarget == null || g.ColonizationTarget != P)
-                        continue;
-                    marked = true;
-                    markedGoal = g;
-                }
-                if (marked)
-                {
+                    EmpireManager.Player.GetEmpireAI().CancelColonization(P);
                     GameAudio.EchoAffirmative();
-                    markedGoal.FinishedShip?.AI.ClearOrders();
-                    EmpireManager.Player.GetEmpireAI().Goals.QueuePendingRemoval(markedGoal);
-                    EmpireManager.Player.GetEmpireAI().Goals.ApplyPendingRemovals();
                 }
                 else
                 {

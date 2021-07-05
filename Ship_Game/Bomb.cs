@@ -1,6 +1,5 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Particle3DSample;
 using Ship_Game.Audio;
 using Ship_Game.Gameplay;
 
@@ -57,13 +56,13 @@ namespace Ship_Game
 
         private void SurfaceImpactEffects()
         {
-            if (Empire.Universe.IsSystemViewOrCloser && TargetPlanet.ParentSystem.isVisible)
+            if (Empire.Universe.IsSystemViewOrCloser && TargetPlanet.ParentSystem.IsVisible)
             {
                 TargetPlanet.PlayPlanetSfx("sd_bomb_impact_01", Position);
                 ExplosionManager.AddExplosionNoFlames(Position, 200f, 7.5f);
-                Empire.Universe.flash.AddParticleThreadB(Position, Vector3.Zero);
+                Empire.Universe.Particles.Flash.AddParticleThreadB(Position, Vector3.Zero);
                 for (int i = 0; i < 50; i++)
-                    Empire.Universe.explosionParticles.AddParticleThreadB(Position, Vector3.Zero);
+                    Empire.Universe.Particles.Explosion.AddParticleThreadB(Position, Vector3.Zero);
             }
         }
 
@@ -130,8 +129,8 @@ namespace Ship_Game
             if (TrailEmitter == null)
             {
                 Velocity *= 0.65f;
-                TrailEmitter     = Empire.Universe.projectileTrailParticles.NewEmitter(500f, Position);
-                FireTrailEmitter = Empire.Universe.fireTrailParticles.NewEmitter(500f, Position);
+                TrailEmitter     = Empire.Universe.Particles.ProjectileTrail.NewEmitter(500f, Position);
+                FireTrailEmitter = Empire.Universe.Particles.FireTrail.NewEmitter(500f, Position);
             }
             TrailEmitter.Update(timeStep.FixedTime, Position);
             FireTrailEmitter.Update(timeStep.FixedTime, Position);

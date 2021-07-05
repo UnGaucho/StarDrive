@@ -111,7 +111,7 @@ namespace Ship_Game
         public bool AddToFleet           => IsCtrlKeyDown && IsShiftKeyDown;
         public bool ReplaceFleet         => IsCtrlKeyDown && !IsShiftKeyDown;
         public bool QueueAction          => IsShiftKeyDown;
-        public bool OrderOption          => IsAltKeyDown;
+        public bool MoveDirectly         => IsKeyDown(Keys.F);
         public bool ShipPieMenu          => KeyPressed(Keys.Q);
         
         // IngameWiki
@@ -134,7 +134,7 @@ namespace Ship_Game
         public bool SpawnPlayerTroop => KeyPressed(Keys.Z);
 
         public bool BlowExplodingModule      => KeyPressed(Keys.N);
-        public bool ToggleSpatialManagerType => KeyPressed(Keys.G);
+        public bool ToggleSpatialManagerType => KeyPressed(Keys.G) && !IsKeyDown(Keys.LeftWindows);
         // Ingame controls
         public bool PreviousTarget  => BackMouseClick;
         public bool ChaseCam        => MiddleMouseClick;

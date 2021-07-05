@@ -50,7 +50,6 @@ namespace Ship_Game.Ships
         public Array<Weapon> Weapons = new Array<Weapon>();
         float JumpTimer = 3f;
         public AudioEmitter SoundEmitter = new AudioEmitter();
-        public Vector2 ScreenPosition;
         public float ScuttleTimer = -1f;
         public Vector2 FleetOffset;
         public Vector2 RelativeFleetOffset;
@@ -81,7 +80,6 @@ namespace Ship_Game.Ships
         public int kills;
         public float experience;
         public bool EnginesKnockedOut;
-        public float InCombatTimer;
         public bool IsTurning { get; private set; }
         public float InhibitionRadius;
         public bool IsPlatform;
@@ -91,11 +89,14 @@ namespace Ship_Game.Ships
         public Ship Mothership;
         public string Name;   // name of the original design of the ship, eg "Subspace Projector". Look at VanityName
         public float PackDamageModifier { get; private set; }
-        public Empire loyalty => LoyaltyTracker.ShipOwner;
+
+        // Current owner of this ship.
+        // This is accessed a lot, so we keep it as a public field
+        public Empire loyalty;
         public LoyaltyChanges LoyaltyTracker { get; private set; }
         public void LoyaltyChangeFromBoarding(Empire empire, bool addNotification = true) => LoyaltyTracker.SetBoardingLoyalty(empire, addNotification);
         public void LoyaltyChangeByGift(Empire empire, bool addNotification = true) => LoyaltyTracker.SetLoyaltyForAbsorbedShip(empire, addNotification);
-        public void LoyaltyChangeAtSpawn(Empire empire, bool addNotification = true) => LoyaltyTracker.SetLoyaltyForNewShip(empire, addNotification);
+        public void LoyaltyChangeAtSpawn(Empire empire) => LoyaltyTracker.SetLoyaltyForNewShip(empire);
 
         // This is the total number of Slots on the ships
         // It does not depend on the number of modules, and is always a constant
@@ -129,11 +130,10 @@ namespace Ship_Game.Ships
         public float ShieldRechargeTimer;
         public bool InCombat;
         public float xRotation;
-        public float ScreenRadius;
         public bool ShouldRecalculatePower;
         public bool Deleted;
         public float BonusEMP_Protection;
-        public bool inSensorRange => KnownByEmpires.KnownByPlayer;
+        public bool InSensorRange => KnownByEmpires.KnownByPlayer;
         public KnownByEmpire KnownByEmpires;
         public KnownByEmpire HasSeenEmpires;
         public bool EMPdisabled;
@@ -167,9 +167,11 @@ namespace Ship_Game.Ships
         public Weapon FastestWeapon => Weapons.FindMax(w => w.ProjectileSpeed);
         public float MaxWeaponError = 0;
 
-        public bool IsDefaultAssaultShuttle => loyalty.data.DefaultAssaultShuttle == Name || loyalty.BoardingShuttle.Name == Name;
+        public bool IsDefaultAssaultShuttle => loyalty.data.DefaultAssaultShuttle == Name || Empire.DefaultBoardingShuttleName == Name;
         public bool IsDefaultTroopShip      => !IsDefaultAssaultShuttle && (loyalty.data.DefaultTroopShip == Name || DesignRole == ShipData.RoleName.troop);
         public bool IsDefaultTroopTransport => IsDefaultTroopShip || IsDefaultAssaultShuttle;
+        public bool IsTroopShip             => DesignRole == ShipData.RoleName.troop;
+        public bool IsBomber                => DesignRole == ShipData.RoleName.bomber;
         public bool IsSubspaceProjector     => Name == "Subspace Projector";
         public bool HasBombs                => BombBays.Count > 0;
 
@@ -178,6 +180,12 @@ namespace Ship_Game.Ships
             get => DesignRole == ShipData.RoleName.construction;
             set => DesignRole = value ? ShipData.RoleName.construction : GetDesignRole();
         }
+
+        public bool CanBeAddedToBuildableShips(Empire empire) => DesignRole != ShipData.RoleName.prototype && DesignRole != ShipData.RoleName.disabled
+                                               && !ResourceManager.ShipRoles[shipData.Role].Protected && !Deleted
+                                               && DesignRole != ShipData.RoleName.supply
+                                               && (empire.isPlayer || ShipGoodToBuild(empire))
+                                               && (!IsPlayerDesign || GlobalStats.UsePlayerDesigns || empire.isPlayer);
 
         public void SetCombatStance(CombatState stance)
         {
@@ -431,7 +439,7 @@ namespace Ship_Game.Ships
                     {
                         // visualize radiation hits on external modules
                         for (int j = 0; j < 50; j++)
-                            Empire.Universe.sparks.AddParticleThreadB(module.GetCenter3D, Vector3.Zero);
+                            Empire.Universe.Particles.Sparks.AddParticleThreadB(module.GetCenter3D, Vector3.Zero);
                     }
                 }
             }
@@ -696,14 +704,6 @@ namespace Ship_Game.Ships
             AI.SetPriorityOrder(true);
         }
 
-        /// <summary>Forces the ship to be in combat without a target.</summary>
-        public void ForceCombatTimer(float timer = 15f) => InCombatTimer = timer;
-
-        public bool InRadiusOfSystem(SolarSystem system) =>
-            system != null && InRadius(system.Position, system.Radius);
-
-        public bool InRadiusOfCurrentSystem => InRadiusOfSystem(System);
-
         public bool InRadius(Vector2 worldPos, float radius)
             => Center.InRadius(worldPos, Radius + radius);
 
@@ -903,7 +903,11 @@ namespace Ship_Game.Ships
             }
         }
 
+        // if enemy ships get within guard mode range, ships will enter combat
+        public const float GuardModeRange = 5000;
+        public const float HoldPositionRange = 1000; // enter combat at this range
         public const float UnarmedRange = 10000; // also used as evade range
+
         public float WeaponsMaxRange { get; private set; }
         public float WeaponsMinRange { get; private set; }
         public float WeaponsAvgRange { get; private set; }
@@ -923,7 +927,7 @@ namespace Ship_Game.Ships
             for (int i = 0; i < Weapons.Count; ++i) // using raw loops for perf
             {
                 Weapon w = Weapons[i];
-                if (w.Module.Active && w.DamageAmount > 0.1f && !w.TruePD)
+                if (w.Module?.Active == true && w.DamageAmount > 0.1f && !w.TruePD)
                     weapons.Add(w);
             }
 
@@ -934,7 +938,7 @@ namespace Ship_Game.Ships
                 for (int i = 0; i < Weapons.Count; ++i) // using raw loops for perf
                 {
                     Weapon w = Weapons[i];
-                    if (w.Module.Active)
+                    if (w.Module?.Active == true)
                         weapons.Add(w);
                 }
             }
@@ -946,14 +950,14 @@ namespace Ship_Game.Ships
         /// </summary>
         /// <param name="weapons">The weapons.</param>
         /// <returns></returns>
-        float[] GetWeaponsRanges(Array<Weapon> weapons)
+        static float[] GetWeaponsRanges(Array<Weapon> weapons)
         {
-            Array<float> ranges = new Array<float>();
+            var ranges = new float[weapons.Count];
 
             for (int i = 0; i < weapons.Count; ++i) // using raw loops for perf
-                ranges.Add(weapons[i].GetActualRange());
+                ranges[i] = weapons[i].GetActualRange();
 
-            return ranges.ToArray();
+            return ranges;
         }
 
 
@@ -999,14 +1003,14 @@ namespace Ship_Game.Ships
 
         // This is used for previewing range during CombatState change
         // Not performance critical.
-        public float GetDesiredCombatRangeForState(CombatState state)
+        float GetDesiredCombatRangeForState(CombatState state)
         {
             float[] ranges = GetWeaponsRanges(GetActiveWeapons());
             return CalcDesiredDesiredCombatRange(ranges, state);
         }
 
         // NOTE: Make sure to validate TestShipRanges.ShipRanges and TestShipRanges.ShipRangesWithModifiers
-        public float CalcDesiredDesiredCombatRange(float[] ranges, CombatState state)
+        float CalcDesiredDesiredCombatRange(float[] ranges, CombatState state)
         {
             if (ranges.Length == 0)
                 return UnarmedRange;
@@ -1015,6 +1019,7 @@ namespace Ship_Game.Ships
             // and still have chance to hit while moving
             switch (state)
             {
+                case CombatState.GuardMode:    return WeaponsMaxRange * 0.9f;
                 case CombatState.Evade:        return UnarmedRange;
                 case CombatState.HoldPosition: return WeaponsMaxRange;
                 case CombatState.ShortRange:   return WeaponsMinRange * 0.9f;
@@ -1047,14 +1052,10 @@ namespace Ship_Game.Ships
                 Rotation += 0.003f + RandomMath.AvgRandomBetween(0.0001f, 0.0005f);
             }
 
-            ShipEngines.Update();
-
             if (timeStep.FixedTime > 0 && (EMPDamage > 0 || EMPdisabled))
                 CauseEmpDamage(-EmpRecovery);
 
             Rotation = Rotation.AsNormalizedRadians();
-
-            //UpdateModulePositions(deltaTime);
 
             if (!EMPdisabled && hasCommand)
             {
@@ -1078,8 +1079,6 @@ namespace Ship_Game.Ships
                 SecondsAlive += 1;
             }
 
-            Carrier.HandleHangarShipsScramble();
-
             InternalSlotsHealthPercent = (float)ActiveInternalSlotCount / InternalSlotCount;
 
             if (InternalSlotsHealthPercent < ShipResupply.ShipDestroyThreshold)
@@ -1097,17 +1096,19 @@ namespace Ship_Game.Ships
             PowerCurrent = Math.Min(PowerCurrent, PowerStoreMax);
 
             shield_percent = shield_max >0 ? 100.0 * shield_power / shield_max : 0;
+
+            ShipEngines.Update();
         }
 
         public void UpdateSensorsAndInfluence(FixedSimTime timeStep)
         {
             // update our knowledge of the surrounding universe
             UpdateInfluence(timeStep);
-            KnownByEmpires.Update(timeStep);
+            KnownByEmpires.Update(timeStep, loyalty);
             SetFleetCapableStatus();
             
             // scan universe and make decisions for combat
-            AI.StartSensorScan(timeStep);
+            AI.ScanForTargets(timeStep);
         }
 
         public void UpdateModulePositions(FixedSimTime timeStep, bool isSystemView, bool forceUpdate = false)
@@ -1277,7 +1278,7 @@ namespace Ship_Game.Ships
                    && AI.OrderQueue.Any(g => (g.Plan == ShipAI.Plan.Rebase || g.Plan == ShipAI.Plan.LandTroop) && g.TargetPlanet == p);
         }
 
-        bool IsSupplyShuttle => Name == loyalty.GetSupplyShuttleName();
+        public bool IsSupplyShuttle => Name == loyalty.GetSupplyShuttleName();
 
         public int RefitCost(Ship newShip)
         {
@@ -1393,7 +1394,7 @@ namespace Ship_Game.Ships
 
         void ExplodeShip(float size, bool addWarpExplode)
         {
-            if (!InFrustum) 
+            if (!InFrustum || !IsVisibleToPlayer) 
                 return;
 
             var position = new Vector3(Center.X, Center.Y, -100f);
@@ -1442,7 +1443,9 @@ namespace Ship_Game.Ships
                     amount = ResourceManager.ShipRoles[shipData.Role].DamageRelations;
                 loyalty.DamageRelationship(pSource.Owner.loyalty, "Destroyed Ship", amount, null);
             }
-            if (!cleanupOnly && InFrustum)
+
+            bool visible = IsVisibleToPlayer;
+            if (!cleanupOnly && visible)
             {
                 string dieSoundEffect;
                 if (SurfaceArea < 80)       dieSoundEffect = "sd_explosion_ship_det_small";
@@ -1475,7 +1478,7 @@ namespace Ship_Game.Ships
                 if (!HasExploded)
                 {
                     HasExploded = true;
-                    if (PlanetCrash != null)
+                    if (PlanetCrash != null || !visible)
                         return;
 
                     // Added by RedFox - spawn flaming spacejunk when a ship dies
@@ -1563,10 +1566,10 @@ namespace Ship_Game.Ships
         public override void RemoveFromUniverseUnsafe()
         {
             AI?.Reset();
-
-            if (IsHangarShip && Mothership.Carrier != null)
+            var carrier = Mothership?.Carrier;
+            if (IsHangarShip && carrier?.AllActiveHangars != null)
             {
-                foreach (ShipModule shipModule in Mothership.Carrier.AllActiveHangars)
+                foreach (ShipModule shipModule in carrier.AllActiveHangars)
                     if (shipModule.TryGetHangarShip(out Ship ship) && ship == this)
                         shipModule.SetHangarShip(null);
             }
@@ -1638,7 +1641,7 @@ namespace Ship_Game.Ships
             fleet = null;
             shipData = null;
             Mothership = null;
-            JumpSfx.Destroy();
+            JumpSfx?.Destroy();
             KnownByEmpires = null;
             HasSeenEmpires = null;
             PlanetCrash = null;
@@ -1657,7 +1660,7 @@ namespace Ship_Game.Ships
             TradeRoutes = null;
             OurTroops = null;
             HostileTroops = null;
-            LoyaltyTracker = null;
+            LoyaltyTracker = default;
         }
 
         public void UpdateShields()
@@ -1833,7 +1836,7 @@ namespace Ship_Game.Ships
 
         public void UpdatePackDamageModifier()
         {
-            float modifier = -0.15f + 0.01f * AI.FriendliesNearby.Count;
+            float modifier = -0.15f + 0.01f * AI.FriendliesNearby.Length;
             PackDamageModifier = modifier.Clamped(-0.15f, 0.3f);
         }
 
@@ -1847,14 +1850,26 @@ namespace Ship_Game.Ships
         {
             if (!Active) return false;
             empire = empire ?? loyalty;
-            float goodPowerSupply = PowerFlowMax - NetPower.NetWarpPowerDraw;
-            float powerTime = GlobalStats.MinimumWarpRange;
-            if (goodPowerSupply < 0)
-                powerTime = PowerStoreMax / -goodPowerSupply * MaxFTLSpeed;
 
-            bool warpTimeGood = goodPowerSupply >= 0 || powerTime >= GlobalStats.MinimumWarpRange;
-            if (!warpTimeGood || empire == null)
-                Empire.Universe?.DebugWin?.DebugLogText($"WARNING ship design {Name} with hull {shipData.Hull} :Bad WarpTime. {NetPower.NetWarpPowerDraw}/{PowerFlowMax}", DebugModes.Normal);
+            //bool goodWarp = rangeStatus >= Status.Excellent;
+            //float goodPowerSupply = PowerFlowMax - NetPower.NetWarpPowerDraw;
+            //float powerTime = GlobalStats.MinimumWarpRange;
+            //if (goodPowerSupply < 0)
+            //    powerTime = PowerStoreMax / -goodPowerSupply * MaxFTLSpeed;
+
+            //bool warpTimeGood = goodPowerSupply >= 0 || powerTime >= GlobalStats.MinimumWarpRange;
+            //if (!warpTimeGood || empire == null)
+            
+            Status rangeStatus = Status.Critical;
+            if (empire != null)
+            {
+                 rangeStatus= WarpRangeStatus(GlobalStats.MinimumWarpRange);
+            }
+            bool warpTimeGood = rangeStatus >= Status.Excellent;
+            if (!warpTimeGood)
+                Empire.Universe?.DebugWin?.DebugLogText(
+                    $"WARNING ship design {Name} with hull {shipData.Hull} :{rangeStatus} WarpTime. {NetPower.NetWarpPowerDraw}/{PowerFlowMax}",
+                    DebugModes.Normal);
 
             return warpTimeGood;
         }

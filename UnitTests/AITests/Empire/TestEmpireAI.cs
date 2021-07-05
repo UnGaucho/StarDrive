@@ -6,6 +6,8 @@ using Ship_Game;
 using Ship_Game.AI;
 using Ship_Game.Empires;
 using Ship_Game.Empires.Components;
+using Ship_Game.GameScreens.NewGame;
+using Ship_Game.GameScreens.ShipDesign;
 using Ship_Game.Ships;
 
 namespace UnitTests.AITests.Empire
@@ -15,16 +17,34 @@ namespace UnitTests.AITests.Empire
     [TestClass]
     public class TestEmpireAI : StarDriveTest
     {
+        // NOTE: This constructor is called every time a [TestMethod] is executed
         public TestEmpireAI()
         {
-            if (Game is null)
-                CreateGameInstance();
-            LoadPlanetContent();
-            CreateTestEnv();
-        }
+            CreateGameInstance();
+            ResourceManager.TestOptions testOptions = ResourceManager.TestOptions.LoadPlanets;
+            testOptions |= ResourceManager.TestOptions.TechContent;
+            LoadStarterShips(testOptions,
+                             "Excalibur-Class Supercarrier", "Corsair", "Supply Shuttle",
+                             "Flak Fang", "Akagi-Class Mk Ia Escort Carrier", "Rocket Inquisitor",
+                             "Cordrazine Prototype", "Cordrazine Troop", "PLT-Defender");
 
-        private Planet P;
-        private Ship_Game.Empire TestEmpire;
+            CreateUniverseAndPlayerEmpire();
+            Enemy.isFaction = false;
+
+            AddPlanetToUniverse(2, 2, 40000, true, Vector2.One);
+            AddPlanetToUniverse(1.9f, 1.9f, 40000, true, new Vector2(5000));
+            AddPlanetToUniverse(1.7f, 1.7f, 40000, true, new Vector2(-5000));
+            for (int x = 0; x < 50; x++)
+                AddPlanetToUniverse(0.1f, 0.1f, 1000, true, Vector2.One);
+            AddHomeWorldToEmpire(Player, out Planet hw1);
+            AddPlanetToUniverse(hw1, true, Vector2.Zero);
+            AddHomeWorldToEmpire(Enemy, out Planet hw2);
+            AddPlanetToUniverse(hw2, true, new Vector2(2000));
+            foreach (string uid in ResourceManager.GetShipTemplateIds())
+                Player.ShipsWeCanBuild.Add(uid);
+
+            Universe.Objects.UpdateLists(true);
+        }
 
         public void AddPlanetToUniverse(Planet p, bool explored, Vector2 pos)
         {
@@ -33,7 +53,7 @@ namespace UnitTests.AITests.Empire
             p.ParentSystem = s1;
             s1.PlanetList.Add(p);
             if (explored)
-                s1.SetExploredBy(TestEmpire);
+                s1.SetExploredBy(Player);
             Ship_Game.Empire.Universe.PlanetsDict.Add(Guid.NewGuid(), p);
             UniverseScreen.SolarSystemList.Add(s1);
         }
@@ -42,38 +62,6 @@ namespace UnitTests.AITests.Empire
             AddDummyPlanet(fertility, minerals, pop, out Planet p);
             p.Center = pos;
             AddPlanetToUniverse(p, explored, pos);
-        }
-
-        void CreateTestEnv()
-        {
-            if (EmpireManager.NumEmpires == 0)
-            {
-                CreateUniverseAndPlayerEmpire(out TestEmpire);
-                Enemy.isFaction = false;
-
-                AddPlanetToUniverse(2, 2, 40000, true, Vector2.One);
-                AddPlanetToUniverse(1.9f, 1.9f, 40000, true, new Vector2(5000));
-                AddPlanetToUniverse(1.7f, 1.7f, 40000, true, new Vector2(-5000));
-                for (int x = 0; x < 50; x++)
-                    AddPlanetToUniverse(0.1f, 0.1f, 1000, true, Vector2.One);
-                AddHomeWorldToEmpire(TestEmpire, out P);
-                AddPlanetToUniverse(P, true, Vector2.Zero);
-                AddHomeWorldToEmpire(Enemy, out P);
-                AddPlanetToUniverse(P, true, new Vector2(2000));
-                LoadStarterShips("Excalibur-Class Supercarrier", "Corsair", "Supply Shuttle",
-                                 "Flak Fang", "Akagi-Class Mk Ia Escort Carrier", "Rocket Inquisitor");
-                foreach (string uid in ResourceManager.GetShipTemplateIds())
-                    Player.ShipsWeCanBuild.Add(uid);
-            }
-        }
-
-        void ClearEmpireShips()
-        {
-            foreach (var ship in Player.OwnedShips)
-            {
-                ship.RemoveFromUniverseUnsafe();
-            }
-            Universe.Objects.UpdateLists(true);
         }
 
         /* going to add tests here
@@ -102,18 +90,83 @@ namespace UnitTests.AITests.Empire
         }*/
 
         [TestMethod]
-        public void FirstTestShipBuilt()
+        public void ShipBuiltAndUpdateBuildLists()
         {
-            ClearEmpireShips();
-            var build = new RoleBuildInfo(3, Player.GetEmpireAI(), true);
+            string testName = "";
+            var build = new RoleBuildInfo(10, Player.GetEmpireAI(), true);
             string shipName = Player.GetEmpireAI().GetAShip(build);
             Assert.IsTrue(shipName == "Rocket Inquisitor", "Build did not create expected ship");
+
+            // prepare shipswecanbuildTest
+            var ship = SpawnShip("Excalibur-Class Supercarrier", Player, Vector2.Zero);
+            var prototype = SpawnShip("Cordrazine Prototype", Player, Vector2.Zero);
+            shipName = ship.Name;
+            Player.ShipsWeCanBuild.Remove(ship.Name);
+            Player.ShipsWeCanBuild.Remove(prototype.Name);
+
+            // verify that we can not currently add wanted ship
+            Player.UpdateShipsWeCanBuild(new Array<String>{ ship.BaseHull.Name });
+            Assert.IsFalse(Player.ShipsWeCanBuild.Contains(shipName), $"{shipName} Without tech this should not have been added. ");
+
+            // after techs are added we should be able to add wanted ship
+            ShipDesignUtils.MarkDesignsUnlockable(new ProgressCounter());
+            foreach (var tech in ship.shipData.TechsNeeded)
+            {
+                Player.UnlockTech(tech, TechUnlockType.Normal);
+            }
+            foreach (var tech in prototype.shipData.TechsNeeded)
+            {
+                Player.UnlockTech(tech, TechUnlockType.Normal);
+            }
+            Player.UnlockedHullsDict[ship.shipData.Hull] = true;
+            Player.UnlockedHullsDict[prototype.shipData.Hull] = true;
+            Player.UpdateShipsWeCanBuild(new Array<String> { ship.shipData.Hull });
+            Assert.IsTrue(Player.ShipsWeCanBuild.Contains(shipName), $"{shipName} Not found in ShipWeCanBuild");
+            Assert.IsTrue(Player.canBuildCarriers, $"{shipName} did not mark {ship.DesignRole} as buildable");
+
+            Player.UpdateShipsWeCanBuild(new Array<String> { prototype.shipData.Hull });
+            Assert.IsFalse(Player.ShipsWeCanBuild.Contains(prototype.Name), "Prototype ship added to shipswecanbuild");
+
+            // Check that adding again does not does not trigger updates.
+            Player.canBuildCapitals = false;
+            Player.UpdateShipsWeCanBuild(new Array<String> { ship.BaseHull.Name });
+            Assert.IsFalse(Player.canBuildCapitals, $"UpdateShipsWeCanBuild triggered unneeded updates");
+
+            // add new player ship design
+            Assert.IsTrue(TestShipAddedToShipsWeCanBuild("Rocket Inquisitor", Player, true), "Bug: Could not add Player ship to shipswecanbuild");
+            Player.ShipsWeCanBuild.Remove("Rocket Inquisitor");
+            Assert.IsFalse(TestShipAddedToShipsWeCanBuild("Excalibur-Class Supercarrier", Player, true, unlockHull: false), "Added ship with locked hull");
+
+            // add new enemy design
+            GlobalStats.UsePlayerDesigns = true;
+            Assert.IsTrue(TestShipAddedToShipsWeCanBuild("Excalibur-Class Supercarrier", Enemy, true), "Bug: Could not add valid design to shipswecanbuild");
+            GlobalStats.UsePlayerDesigns = false;
+            Assert.IsFalse(TestShipAddedToShipsWeCanBuild("Flak Fang", Enemy, true), "Use Player design restriction added to shipswecanbuild");
+
+            // fail to add incompatible design
+            Assert.IsFalse(TestShipAddedToShipsWeCanBuild("Supply Shuttle", Player, true), "Bug: Supply shuttle added to shipsWeCanBuild");
+
+            testName = "Update Structures: ";
+            Assert.IsTrue(TestShipAddedToShipsWeCanBuild("PLT-Defender", Player, false), testName + "ShipsWeCanBuild was not updated.");
+            Assert.IsTrue(Player.structuresWeCanBuild.Contains("PLT-Defender"), testName + "StructuresWeCanBuild Was Not Updated");
+        }
+
+        bool TestShipAddedToShipsWeCanBuild(string baseDesign, Ship_Game.Empire empire, bool playerDesign, bool unlockHull = true)
+        {
+            string key1 = RandomMath.IntBetween(1, 999999).ToString();
+            string key2 = RandomMath.IntBetween(1, 999999).ToString();
+            string newName = baseDesign + $"-test-{key1}-test-{key2}";
+            var ship = SpawnShip(baseDesign, empire, Vector2.Zero);
+            empire.UnlockedHullsDict[ship.shipData.Hull] = unlockHull;
+            ship.shipData.Name = newName;
+            ResourceManager.AddShipTemplate(ship.shipData, false, playerDesign);
+            empire.UpdateShipsWeCanBuild();
+            return empire.ShipsWeCanBuild.Contains(newName);
         }
 
         [TestMethod]
         public void TestBuildCounts()
         {
-            ClearEmpireShips();
             // setup Build
             var build = new RoleBuildInfo(2, Player.GetEmpireAI(), true);
 
@@ -155,7 +208,6 @@ namespace UnitTests.AITests.Empire
         [TestMethod]
         public void TestBuildScrap()
         {
-            ClearEmpireShips();
             var combatRole = RoleBuildInfo.RoleCounts.ShipRoleToCombatRole(ShipData.RoleName.fighter);
             float buildCapacity = 0.75f;
             var build = new RoleBuildInfo(buildCapacity, Player.GetEmpireAI(), true);
@@ -196,7 +248,7 @@ namespace UnitTests.AITests.Empire
                 build                  = new RoleBuildInfo(buildCapacity, Player.GetEmpireAI(), false);
                 int roleCountWanted    = build.RoleCountDesired(combatRole);
                 int shipsBeingScrapped = ships.Filter(s => s.AI.State == AIState.Scrap).Length;
-                int expectedBuildCount = (int)(build.RoleBudget(combatRole) / roleUnitMaint);
+                int expectedBuildCount = (int)Math.Ceiling(build.RoleBudget(combatRole) / roleUnitMaint);
 
                 Assert.AreEqual(expectedBuildCount, roleCountWanted);
 
@@ -220,8 +272,7 @@ namespace UnitTests.AITests.Empire
         [TestMethod]
         public void TestOverBudgetSpending()
         {
-            ClearEmpireShips();
-            Player.Money = 1000;
+            Player.Money = 500;
 
             for (int x = -1; x < 11; x++)
             {
@@ -230,10 +281,10 @@ namespace UnitTests.AITests.Empire
                 percent = 2 - percent;
                 Assert.IsTrue(overSpend.AlmostEqual(percent), $"Expected {percent} got {overSpend}");
             }
-            Player.Money = 100;
+            Player.Money = 50;
             for (int x = -1; x < 1; x++)
             {
-                float percent = x * 0.1f;
+                float percent = x * 0.05f;
                 float overSpend = Player.GetEmpireAI().OverSpendRatio(1000, percent, 10f);
                 percent = 0.2f - percent;
                 Assert.IsTrue(overSpend.AlmostEqual(percent), $"Expected {percent} got {overSpend}");
@@ -243,7 +294,6 @@ namespace UnitTests.AITests.Empire
         [TestMethod]
         public void TestShipListTracking()
         {
-            ClearEmpireShips();
             Assert.IsTrue(Player.OwnedShips.Count == 0);
             IEmpireShipLists playerShips = Player;
 
@@ -284,7 +334,6 @@ namespace UnitTests.AITests.Empire
         [TestMethod]
         public void ShipListConcurrencyStressTest()
         {
-            ClearEmpireShips();
             Assert.AreEqual(0, Enemy.OwnedShips.Count);
 
             // we need to rework basic empires. Proper empire updates cannot be done the way they currently are.
@@ -299,7 +348,7 @@ namespace UnitTests.AITests.Empire
                     if (RandomMath.RollDice(50))
                     {
                         planet.Owner = empire;
-                        empire.GetEmpireAI().AreasOfOperations.Add(new AO(P, 10));
+                        empire.GetEmpireAI().AreasOfOperations.Add(new AO(Enemy.Capital, 10));
                     }
                 }
             }
@@ -416,8 +465,6 @@ namespace UnitTests.AITests.Empire
         [TestMethod]
         public void TestDefeatedEmpireShipRemoval()
         {
-
-            ClearEmpireShips();
             Assert.IsTrue(Player.OwnedShips.Count == 0);
             string shipName = "Rocket Inquisitor";
 
@@ -433,7 +480,6 @@ namespace UnitTests.AITests.Empire
         [TestMethod]
         public void TestMergedEmpireShipRemoval()
         {
-            ClearEmpireShips();
             Assert.IsTrue(Player.OwnedShips.Count == 0);
             string shipName = "Rocket Inquisitor";
 
@@ -446,6 +492,40 @@ namespace UnitTests.AITests.Empire
             Assert.IsTrue(Player.OwnedShips.Count == 1);
             // test that ship is removed from target empire
             Assert.AreEqual(0, Enemy.OwnedShips.Count);
+        }
+        [TestMethod]
+        public void AIManagedPools()
+        {
+            Player.GetEmpireAI().AreasOfOperations.Add(new AO(Player.Capital, 10));
+            Enemy.ShipsWeCanBuild = Player.ShipsWeCanBuild;
+            Player.isPlayer = false;
+
+            // add ships one by one for easier debugging. 
+            foreach (var shipName in Enemy.ShipsWeCanBuild)
+            {
+                var ship = SpawnShip(shipName, Enemy, Vector2.Zero);
+                ship.LoyaltyChangeByGift(Player);
+                Universe.Objects.UpdateLists();
+                Universe.EndOfTurnUpdate(TestSimStep);
+            }
+
+            var forcePools = Player.AIManagedShips.GetShipsFromOffensePools();
+            var shipsOnDefense = new Array<Ship>();
+            var shipsThatCantBeAdded = new Array<Ship>();
+
+            // filter out ships that should not be in force pool
+            foreach (var ship in Player.OwnedShips)
+            {
+                if (ship.AI.State == AIState.SystemDefender) shipsOnDefense.Add(ship);
+                if (ship.DesignRole == ShipData.RoleName.supply) shipsThatCantBeAdded.Add(ship);
+                if (ship.IsPlatformOrStation) shipsThatCantBeAdded.Add(ship);
+            }
+
+            // verify counts
+            int unAdded = shipsOnDefense.Count + shipsThatCantBeAdded.Count;
+            Assert.AreEqual(forcePools.Count , Player.OwnedShips.Count - unAdded);
+            Assert.AreEqual(shipsOnDefense.Count, 1, "Did Something change in ship system defender states?");
+            Assert.AreEqual(shipsThatCantBeAdded.Count, 2,"Did something change in supply shuttles or stations");
         }
     }
 }

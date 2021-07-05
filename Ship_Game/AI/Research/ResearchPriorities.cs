@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using Ship_Game.Gameplay;
+using static Ship_Game.AI.Research.ResearchOptions;
 
 namespace Ship_Game.AI.Research
 {
@@ -9,18 +10,19 @@ namespace Ship_Game.AI.Research
         public float ResearchDebt { get; }
         public float Wars { get; }
         public float Economics { get; }
-        public float BuildCapacity { get; }
+
         private readonly float FoodNeeds;
         private readonly float Industry;
         public readonly string TechCategoryPrioritized;
         private readonly Empire OwnerEmpire;
+        private readonly ResearchOptions Priority;
 
-        public ResearchPriorities(Empire empire, float buildCapacity) : this()
+        public ResearchPriorities(Empire empire, ResearchOptions options) : this()
         {
             OwnerEmpire   = empire;
-            BuildCapacity = buildCapacity;
+            Priority      = options;
             ResearchDebt  = CalcResearchDebt(empire, out Array<TechEntry> availableTechs);
-            Wars          = CalcWars(empire, availableTechs);
+            Wars          = OwnerEmpire.GetEmpireAI().ThreatLevel;
             Economics     = CalcEconomics(empire);
 
             CalcFoodAndIndustry(empire, out FoodNeeds, out Industry);
@@ -32,7 +34,7 @@ namespace Ship_Game.AI.Research
         string CreateTechString(Map<string, int> priority, Array<TechEntry> availableTechs)
         {
             string techCategoryPrioritized = "TECH";
-            int maxStrings                 = 7;
+            int maxStrings                 = priority.Count + 3;
             int numStrings                 = 0;
             foreach (var pWeighted in priority.OrderByDescending(weight => weight.Value))
             {
@@ -44,8 +46,8 @@ namespace Ship_Game.AI.Research
 
                 if (pWeighted.Key == "SHIPTECH")
                 {
-                    techCategoryPrioritized += GetShipTechString(availableTechs);
-                    numStrings += 3;
+                    techCategoryPrioritized += GetShipTechString(availableTechs, out int numShipTechs);
+                    numStrings += numShipTechs;
                 }
                 else if (availableTechs.Any(t => t.IsTechnologyType(ChooseTech.ConvertTechStringTechType(pWeighted.Key))))
                 {
@@ -57,19 +59,7 @@ namespace Ship_Game.AI.Research
 
             return techCategoryPrioritized;
         }
-
-        float CalcEnemyThreats()
-        {
-            float score = 0;
-            foreach (Empire empire in EmpireManager.ActiveMajorEmpires)
-            {
-                if (OwnerEmpire.IsEmpireAttackable(empire))
-                    score += empire.TotalScore;
-            }
-
-            return score;
-        }
-
+        
         void AddDebugLog(Map<string, int> priority)
         {
             int maxNameLength = priority.Keys.Max(name => name.Length);
@@ -81,29 +71,19 @@ namespace Ship_Game.AI.Research
         Map<string, int> CreatePriorityMap(Empire empire)
         {
             EconomicResearchStrategy strat = empire.Research.Strategy;
+            var threat = OwnerEmpire.GetEmpireAI().ThreatLevel;
             var priority = new Map<string, int>
             {
-                { "SHIPTECH",     Randomizer(strat.MilitaryRatio,  Wars)},
-                { "Research",     Randomizer(strat.ResearchRatio,  ResearchDebt)},
-                { "Colonization", Randomizer(strat.ExpansionRatio, FoodNeeds)   },
-                { "Economic",     Randomizer(strat.ExpansionRatio, Economics)   },
-                { "Industry",     Randomizer(strat.IndustryRatio,  Industry)    },
-                { "General",      Randomizer(strat.ResearchRatio,  0)           },
-                { "GroundCombat", Randomizer(strat.MilitaryRatio,  Wars * 0.75f)},
+                { "SHIPTECH",     Randomizer(threat,                Priority.GetPriority(ResearchArea.ShipTech))},
+                { "Research",     Randomizer(strat.ResearchRatio  + Priority.GetPriority(ResearchArea.Research),     ResearchDebt)},
+                { "Colonization", Randomizer(strat.ExpansionRatio + Priority.GetPriority(ResearchArea.Colonization), FoodNeeds)},
+                { "Economic",     Randomizer(strat.ExpansionRatio + Priority.GetPriority(ResearchArea.Economic),     Economics)},
+                { "Industry",     Randomizer(strat.IndustryRatio  + Priority.GetPriority(ResearchArea.Industry),     Industry)},
+                { "General",      Randomizer(strat.ResearchRatio  + Priority.GetPriority(ResearchArea.General),      0)},
+                { "GroundCombat", Randomizer(strat.MilitaryRatio  + Priority.GetPriority(ResearchArea.GroundCombat), threat)},
             };
 
             return priority;
-        }
-
-        float CalcWars(Empire empire, Array<TechEntry> availableTechs)
-        {
-            float enemyThreats   = CalcEnemyThreats();
-            float factionThreats = empire.TotalFactionsStrTryingToClear() / empire.OffensiveStrength.LowerBound(1);
-            float wars           = factionThreats / empire.OffensiveStrength.LowerBound(1) 
-                                   + enemyThreats / OwnerEmpire.TotalScore.LowerBound(1);
-
-            wars += OwnerEmpire.GetEmpireAI().TechChooser.LineFocus.BestShipNeedsHull(availableTechs) ? 0.5f : 0;
-            return wars.Clamped(0, 4);
         }
 
         void CalcFoodAndIndustry(Empire empire, out float foodNeeds, out float industry)
@@ -140,7 +120,7 @@ namespace Ship_Game.AI.Research
         float CalcEconomics(Empire empire)
         {
             float workerEfficiency = empire.Research.NetResearch / empire.Research.MaxResearchPotential.LowerBound(1);
-            return empire.data.TaxRate*3 + workerEfficiency;
+            return (empire.GetEmpireAI().CreditRating + workerEfficiency) / 2f;
         }
 
         float CalcResearchDebt(Empire empire, out Array<TechEntry> availableTechs)
@@ -184,10 +164,18 @@ namespace Ship_Game.AI.Research
             return (needs * p.Level / 2).LowerBound(0);
         }
 
-        string GetShipTechString(Array<TechEntry> availableTech)
+        string GetShipTechString(Array<TechEntry> availableTech, out int numTechs)
         {
-            string shipTechToAdd = "";
+            string shipTechToAdd   = "";
+            numTechs               = 0;
             Array<string> shipTech = new Array<string>();
+
+            if (availableTech.Any(t => t.IsTechnologyType(ChooseTech.ConvertTechStringTechType("ShipHull"))))
+            {
+                shipTechToAdd += ":ShipHull"; // prioritize hulls since there is a ship which can be used
+                numTechs      += 1;
+            }
+
             if (availableTech.Any(t => t.IsTechnologyType(ChooseTech.ConvertTechStringTechType("ShipWeapons"))))
                 shipTech.Add("ShipWeapons");
 
@@ -197,15 +185,13 @@ namespace Ship_Game.AI.Research
             if (availableTech.Any(t => t.IsTechnologyType(ChooseTech.ConvertTechStringTechType("ShipGeneral"))))
                 shipTech.Add("ShipGeneral");
 
+            numTechs += shipTech.Count;
             while (shipTech.Count > 0)
             {
                 string techToAdd = shipTech.RandItem();
                 shipTechToAdd   += $":{techToAdd}";
                 shipTech.Remove(techToAdd);
             }
-
-            if (availableTech.Any(t => t.IsTechnologyType(ChooseTech.ConvertTechStringTechType("ShipHull"))))
-                shipTechToAdd += ":ShipHull";
 
             return shipTechToAdd;
         }

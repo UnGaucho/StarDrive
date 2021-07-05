@@ -28,17 +28,24 @@ namespace Ship_Game.Ships
             experience = data.experience;
             shipData   = data;
 
-            LoyaltyTracker = new Components.LoyaltyChanges(this, empire);
-
             if (fromSave)
                 data.UpdateBaseHull(); // when loading from save, the basehull data might not be set
+            
+            // loyalty must be set before modules are initialized
+            LoyaltyTracker = new Components.LoyaltyChanges(this, empire);
+            // loyalty tracker can not add to the empire ships here yet as this is done during resource loading.
+            // currently this is done during create entities for save load and
 
             if (!CreateModuleSlotsFromData(data.ModuleSlots, fromSave, isTemplate, shipyardDesign))
                 return;
 
+            // Ships unable to create the moduleslots cant be safely added to empire shiplists. 
+            if (!isTemplate && !shipyardDesign)
+                LoyaltyTracker.OnSpawn(this);
+
             Stats = new ShipStats(this);
-            KnownByEmpires = new Components.KnownByEmpire(this);
-            HasSeenEmpires = new Components.KnownByEmpire(this);
+            KnownByEmpires = new Components.KnownByEmpire();
+            HasSeenEmpires = new Components.KnownByEmpire();
 
             InitializeThrusters(data);
             InitializeStatus(fromSave);
@@ -59,14 +66,18 @@ namespace Ship_Game.Ships
             BaseCanWarp  = template.BaseCanWarp;
             shipData     = template.shipData;
 
+            // loyalty must be set before modules are initialized
             LoyaltyTracker = new Components.LoyaltyChanges(this, owner);
 
             if (!CreateModuleSlotsFromData(template.shipData.ModuleSlots, fromSave: false))
                 return; // return and crash again...
+            
+            // ship must not be added to empire ship list until after modules are validated.
+            LoyaltyTracker.OnSpawn(this);
 
             Stats = new ShipStats(this);
-            KnownByEmpires = new Components.KnownByEmpire(this);
-            HasSeenEmpires = new Components.KnownByEmpire(this);
+            KnownByEmpires = new Components.KnownByEmpire();
+            HasSeenEmpires = new Components.KnownByEmpire();
 
             VanityName = ResourceManager.ShipNames.GetName(owner.data.Traits.ShipType, shipData.Role);
 
@@ -177,10 +188,9 @@ namespace Ship_Game.Ships
             Rotation         = save.Rotation;
             Velocity         = save.Velocity;
             IsSpooling       = save.AfterBurnerOn;
-            InCombatTimer    = save.InCombatTimer;
             TetherGuid       = save.TetheredTo;
             TetherOffset     = save.TetherOffset;
-            InCombat         = InCombatTimer > 0f;
+            InCombat         = save.InCombat;
 
             TransportingFood          = save.TransportingFood;
             TransportingProduction    = save.TransportingProduction;
@@ -236,11 +246,12 @@ namespace Ship_Game.Ships
         {
             Level = shipData.Level;
 
-            if (shipData.Role == ShipData.RoleName.fighter || IsHangarShip 
-                && (DesignRole == ShipData.RoleName.corvette || DesignRole == ShipData.RoleName.drone))
+            if (shipData.Role == ShipData.RoleName.fighter)
                 Level += loyalty.data.BonusFighterLevels;
 
             Level += loyalty.data.BaseShipLevel;
+
+            Level += loyalty.data.RoleLevels[(int)DesignRole - 1];
 
             if (!loyalty.isPlayer)
                 Level += loyalty.DifficultyModifiers.ShipLevel;
@@ -299,8 +310,8 @@ namespace Ship_Game.Ships
             if (ship == null)
                 return null;
 
-            if (ship.DesignRole == ShipData.RoleName.drone || ship.DesignRole == ShipData.RoleName.corvette)
-                ship.Level += owner.data.BonusFighterLevels;
+            //if (ship.DesignRole == ShipData.RoleName.drone || ship.DesignRole == ShipData.RoleName.corvette)
+            //    ship.Level += owner.data.BonusFighterLevels;
 
             ship.Mothership = parent;
             ship.Velocity   = parent.Velocity;
@@ -346,7 +357,6 @@ namespace Ship_Game.Ships
             if (shipData == null)
                 return;
             AI.CombatState = shipData.CombatState;
-            AI.CombatAI    = new CombatAI(this);
         }
 
         void InitializeAIFromAISave(SavedGame.ShipAISave aiSave)
@@ -355,10 +365,6 @@ namespace Ship_Game.Ships
             AI.State              = aiSave.State;
             AI.DefaultAIState     = aiSave.DefaultState;
             AI.MovePosition       = aiSave.MovePosition;
-            AI.OrbitTargetGuid    = aiSave.OrbitTarget;
-            AI.TargetGuid         = aiSave.AttackTarget;
-            AI.SystemToDefendGuid = aiSave.SystemToDefend;
-            AI.EscortTargetGuid   = aiSave.EscortTarget;
             AI.HasPriorityTarget  = aiSave.PriorityTarget;
 
             AI.SetPriorityOrder(aiSave.PriorityOrder);
@@ -383,8 +389,9 @@ namespace Ship_Game.Ships
 
             // Begin: ShipSubClass Initialization. Put all ship sub class initializations here
             if (AI == null)
+            {
                 InitializeAI();
-            AI.CombatState = shipData.CombatState;
+            }
             // End: ship subclass initializations.
 
             RecalculatePower(); // NOTE: Must be before InitializeStatus

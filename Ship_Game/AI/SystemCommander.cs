@@ -116,8 +116,6 @@ namespace Ship_Game.AI
             if (OurShips.Remove(shipToRemove.guid))
             {
                 CurrentShipStr -= (int)shipToRemove.BaseStrength;
-                shipToRemove.AI.SystemToDefend = null;
-                shipToRemove.AI.SystemToDefendGuid = Guid.Empty;
                 shipToRemove.AI.ClearOrders();
                 return true;
             }
@@ -224,9 +222,9 @@ namespace Ship_Game.AI
 
         public float PlanetTroopMin(Planet planet)
         {
-            float troopMin = MinPlanetTroopLevel * PlanetToSystemDevelopmentRatio(planet);
-
-            return Math.Max(1, troopMin);
+            float troopMultiplier = !Us.IsAtWarWithMajorEmpire && Us.ActiveWarPreparations == 0 ? 0.5f : 1;
+            float troopMin        = MinPlanetTroopLevel * PlanetToSystemDevelopmentRatio(planet) * troopMultiplier;
+            return troopMin.LowerBound(1);
         }
 
         public float TroopStrengthMin(Planet planet)

@@ -1,7 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Xna.Framework.Graphics;
+using Ship_Game.Utils;
 
 #pragma warning disable 0649 // uninitialized struct
 
@@ -46,6 +48,7 @@ namespace Ship_Game.Spatial
         [DllImport(Lib)] static extern IntPtr SpatialCreate(SpatialType type, int worldSize, int cellSize, int cellSize2);
         [DllImport(Lib)] static extern void SpatialDestroy(IntPtr spatial);
         
+        [DllImport(Lib)] static extern IntPtr SpatialGetRoot(IntPtr spatial);
         [DllImport(Lib)] static extern SpatialType SpatialGetType(IntPtr spatial);
         [DllImport(Lib)] static extern int SpatialWorldSize(IntPtr spatial);
         [DllImport(Lib)] static extern int SpatialFullSize(IntPtr spatial);
@@ -53,17 +56,19 @@ namespace Ship_Game.Spatial
         [DllImport(Lib)] static extern int SpatialMaxObjects(IntPtr spatial);
 
         [DllImport(Lib)] static extern void SpatialClear(IntPtr spatial);
-        [DllImport(Lib)] static extern void SpatialRebuild(IntPtr spatial);
+        [DllImport(Lib)] static extern IntPtr SpatialRebuild(IntPtr spatial);
 
         [DllImport(Lib)] static extern int SpatialInsert(IntPtr spatial, ref NativeSpatialObject o);
         [DllImport(Lib)] static extern void SpatialUpdate(IntPtr spatial, int objectId, ref AABoundingBox2Di rect);
         [DllImport(Lib)] static extern void SpatialRemove(IntPtr spatial, int objectId);
 
-        [DllImport(Lib)] static extern void SpatialCollideAll(IntPtr spatial, ref CollisionParams param, ref CollisionPairs outResults);
-        [DllImport(Lib)] static extern int SpatialFindNearby(IntPtr spatial, int* outResults, ref NativeSearchOptions opt);
+        [DllImport(Lib)] static extern void SpatialCollideAll(IntPtr spatial, IntPtr root, ref CollisionParams param, ref CollisionPairs outResults);
+        [DllImport(Lib)] static extern int SpatialFindNearby(IntPtr spatial, IntPtr root, int* outResults, ref NativeSearchOptions opt);
 
-        IntPtr Spat;
-        readonly Array<GameplayObject> Objects = new Array<GameplayObject>(capacity:512);
+        IntPtr Spat; // The spatial structure interface
+        IntPtr Root; // Current active Root
+        GameplayObject[] Objects = Empty<GameplayObject>.Array;
+        readonly ReaderWriterLockSlim Lock = new ReaderWriterLockSlim(LockRecursionPolicy.NoRecursion);
 
         public SpatialType Type { get; }
         public float WorldSize { get; }
@@ -83,6 +88,7 @@ namespace Ship_Game.Spatial
         {
             Type = type;
             Spat = SpatialCreate(type, worldSize, cellSize, cellSize2);
+            Root = SpatialGetRoot(Spat);
 
             WorldSize = worldSize;
             FullSize = SpatialFullSize(Spat);
@@ -99,15 +105,17 @@ namespace Ship_Game.Spatial
             GC.SuppressFinalize(this);
             IntPtr tree = Spat;
             Spat = IntPtr.Zero;
+            Root = IntPtr.Zero;
             SpatialDestroy(tree);
         }
 
         public void Clear()
         {
-            lock (Objects)
+            using (Lock.AcquireWriteLock())
             {
                 SpatialClear(Spat);
-                Objects.Clear();
+                Root = SpatialGetRoot(Spat);
+                Objects = Empty<GameplayObject>.Array;
             }
         }
 
@@ -116,65 +124,61 @@ namespace Ship_Game.Spatial
             int count = allObjects.Count;
             int maxObjects = Math.Max(MaxObjects, count);
 
-            lock (Objects)
+            var objects = new GameplayObject[maxObjects];
+            GameplayObject[] gameObjects = allObjects.GetInternalArrayItems();
+            for (int i = 0; i < count; ++i)
             {
-                Objects.Resize(maxObjects);
-                GameplayObject[] gameObjects = allObjects.GetInternalArrayItems();
-                for (int i = 0; i < count; ++i)
+                GameplayObject go = gameObjects[i];
+                int objectId = go.SpatialIndex;
+                if (go.Active)
                 {
-                    GameplayObject go = gameObjects[i];
-                    int objectId = go.SpatialIndex;
-                    if (go.Active)
+                    if (go.ReinsertSpatial) // if marked for reinsert, remove from Spat
                     {
-                        if (go.ReinsertSpatial) // if marked for reinsert, remove from Spat
+                        go.ReinsertSpatial = false;
+                        if (objectId != -1)
                         {
-                            go.ReinsertSpatial = false;
-                            if (objectId != -1)
-                            {
-                                SpatialRemove(Spat, objectId);
-                                go.SpatialIndex = -1;
-                                objectId = -1;
-                            }
-                        }
-
-                        if (objectId == -1) // insert new
-                        {
-                            var so = new NativeSpatialObject(go);
-                            objectId = SpatialInsert(Spat, ref so);
-                            go.SpatialIndex = objectId;
-                            Objects[objectId] = go;
-                        }
-                        else // update existing
-                        {
-                            var rect = new AABoundingBox2Di(go);
-                            SpatialUpdate(Spat, objectId, ref rect);
-                            Objects[objectId] = go;
+                            SpatialRemove(Spat, objectId);
+                            go.SpatialIndex = -1;
+                            objectId = -1;
                         }
                     }
-                    else if (objectId != -1)
+
+                    if (objectId == -1) // insert new
                     {
-                        Objects[objectId] = null;
-                        SpatialRemove(Spat, objectId);
-                        go.SpatialIndex = -1;
+                        var so = new NativeSpatialObject(go);
+                        objectId = SpatialInsert(Spat, ref so);
+                        go.SpatialIndex = objectId;
+                        objects[objectId] = go;
+                    }
+                    else // update existing
+                    {
+                        var rect = new AABoundingBox2Di(go);
+                        SpatialUpdate(Spat, objectId, ref rect);
+                        objects[objectId] = go;
                     }
                 }
-                SpatialRebuild(Spat);
+                else if (objectId != -1)
+                {
+                    objects[objectId] = null;
+                    SpatialRemove(Spat, objectId);
+                    go.SpatialIndex = -1;
+                }
+            }
+
+            // we need to lock down the entire structure while updating
+            using (Lock.AcquireWriteLock())
+            {
+                Root = SpatialRebuild(Spat);
+                Objects = objects;
             }
         }
 
-        [StructLayout(LayoutKind.Sequential)]
-        struct CollisionParams
+        (GameplayObject[], IntPtr) GetObjectsAndRootSafe()
         {
-            public byte IgnoreSameLoyalty; // if 1, same loyalty objects don't collide
-            public byte SortCollisionsById; // if 1, collision results are sorted by object Id-s, ascending
-            public byte ShowCollisions; // if 1, collisions are shown as debug
+            using (Lock.AcquireReadLock())
+                return (Objects, Root);
         }
-        public struct CollisionPairs
-        {
-            public CollisionPair* Data;
-            public int Size;
-            public int Capacity;
-        }
+
         public int CollideAll(FixedSimTime timeStep)
         {
             var p = new CollisionParams
@@ -183,33 +187,20 @@ namespace Ship_Game.Spatial
                 SortCollisionsById = 0,
                 ShowCollisions = (byte)(Empire.Universe?.Debug == true ? 1 : 0),
             };
+            
+            GameplayObject[] objects = Objects;
+            IntPtr root = Root;
+            //(GameplayObject[] objects, IntPtr root) = GetObjectsAndRootSafe();
 
             // get the collisions
             CollisionPairs results = default;
-            SpatialCollideAll(Spat, ref p, ref results);
+            SpatialCollideAll(Spat, root, ref p, ref results);
             
-            int numCollisions = NarrowPhase.Collide(timeStep, results.Data, results.Size, Objects);
+            int numCollisions = NarrowPhase.Collide(timeStep, results.Data, results.Size, objects);
             return numCollisions;
         }
 
-        [UnmanagedFunctionPointer(CC)]
-        delegate int SearchFilter(int objectId);
-
-        [StructLayout(LayoutKind.Sequential)]
-        struct NativeSearchOptions
-        {
-            public AABoundingBox2Di SearchRect;
-            public Circle RadialFilter;
-            public int MaxResults;
-            public int FilterByType;
-            public int FilterExcludeObjectId;
-            public int FilterExcludeByLoyalty;
-            public int FilterIncludeOnlyByLoyalty;
-            public SearchFilter FilterFunction;
-            public int EnableSearchDebugId;
-        };
-
-        public GameplayObject[] FindNearby(in SearchOptions opt)
+        public GameplayObject[] FindNearby(ref SearchOptions opt)
         {
             int ignoreId = -1;
             if (opt.Exclude != null && opt.Exclude.SpatialIndex >= 0)
@@ -225,43 +216,70 @@ namespace Ship_Game.Spatial
                     Radius=(int)(opt.FilterRadius + 0.5f) // ceil
                 },
                 MaxResults = opt.MaxResults,
-                FilterByType = (int)opt.Type,
-                FilterExcludeObjectId = ignoreId,
-                FilterExcludeByLoyalty = opt.ExcludeLoyalty?.Id ?? 0,
-                FilterIncludeOnlyByLoyalty = opt.OnlyLoyalty?.Id ?? 0,
+                SortByDistance = opt.SortByDistance ? 1 : 0,
+                Type = (int)opt.Type,
+                ExcludeObjectId = ignoreId,
+                ExcludeLoyalty = opt.ExcludeLoyalty?.Id ?? 0,
+                IncludeLoyalty = opt.OnlyLoyalty?.Id ?? 0,
                 FilterFunction = null,
-                EnableSearchDebugId = opt.DebugId,
+                DebugId = opt.DebugId,
             };
             
-            lock (Objects)
+            (GameplayObject[] objects, IntPtr root) = GetObjectsAndRootSafe();
+
+            if (opt.FilterFunction != null)
             {
-                if (opt.FilterFunction != null)
+                SearchFilterFunc filterFunc = opt.FilterFunction;
+                nso.FilterFunction = (int objectId) =>
                 {
-                    SearchFilterFunc filterFunc = opt.FilterFunction;
-                    nso.FilterFunction = (int objectId) =>
-                    {
-                        GameplayObject go = Objects[objectId];
-                        bool success = filterFunc(go);
-                        return success ? 1 : 0;
-                    };
-                }
-
-                int* objectIds = stackalloc int[opt.MaxResults];
-                GameplayObject[] objects = Objects.GetInternalArrayItems();
-                int resultCount = SpatialFindNearby(Spat, objectIds, ref nso);
-                return LinearSearch.Copy(objectIds, resultCount, objects);
+                    GameplayObject go = objects[objectId];
+                    bool success = filterFunc(go);
+                    return success ? 1 : 0;
+                };
             }
+
+            int* objectIds = stackalloc int[opt.MaxResults];
+            int resultCount = SpatialFindNearby(Spat, root, objectIds, ref nso);
+            return LinearSearch.Copy(objectIds, resultCount, objects);
         }
 
-        public GameplayObject[] FindLinear(in SearchOptions opt)
+        public GameplayObject[] FindLinear(ref SearchOptions opt)
         {
-            lock (Objects)
-            {
-                GameplayObject[] objects = Objects.GetInternalArrayItems();
-                int count = Objects.Count;
-                return LinearSearch.FindNearby(opt, objects, count);
-            }
+            GameplayObject[] objects = Objects;
+            return LinearSearch.FindNearby(ref opt, objects, objects.Length);
         }
+        
+        [StructLayout(LayoutKind.Sequential)]
+        struct CollisionParams
+        {
+            public byte IgnoreSameLoyalty; // if 1, same loyalty objects don't collide
+            public byte SortCollisionsById; // if 1, collision results are sorted by object Id-s, ascending
+            public byte ShowCollisions; // if 1, collisions are shown as debug
+        }
+        public struct CollisionPairs
+        {
+            public CollisionPair* Data;
+            public int Size;
+            public int Capacity;
+        }
+        
+        [UnmanagedFunctionPointer(CC)]
+        delegate int SearchFilter(int objectId);
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct NativeSearchOptions
+        {
+            public AABoundingBox2Di SearchRect;
+            public Circle RadialFilter;
+            public int MaxResults;
+            public int SortByDistance;
+            public int Type;
+            public int ExcludeObjectId;
+            public int ExcludeLoyalty;
+            public int IncludeLoyalty;
+            public SearchFilter FilterFunction;
+            public int DebugId;
+        };
 
         struct Point
         {
@@ -304,13 +322,12 @@ namespace Ship_Game.Spatial
         }
 
         [DllImport(Lib)]
-        static extern void SpatialDebugVisualize(IntPtr spatial, ref NativeVisOptions opt, ref QtreeVisualizerBridge vis);
+        static extern void SpatialDebugVisualize(IntPtr spatial, IntPtr root, ref NativeVisOptions opt, ref QtreeVisualizerBridge vis);
         
         static GameScreen Screen;
         static void DrawRect(AABoundingBox2Di r, SpatialColor c)
         {
-            Screen.DrawRectangleProjected(new Rectangle(r.X1, r.Y1, r.Width, r.Height),
-                                          new Color(c.r, c.g, c.b, c.a));
+            Screen.DrawRectProjected(r, new Color(c.r, c.g, c.b, c.a));
         }
         static void DrawCircle(Circle ci, SpatialColor c)
         {
@@ -354,7 +371,7 @@ namespace Ship_Game.Spatial
             };
 
             Screen = screen;
-            SpatialDebugVisualize(Spat, ref nativeOpt, ref vis);
+            SpatialDebugVisualize(Spat, Root, ref nativeOpt, ref vis);
             Screen = null;
         }
     }

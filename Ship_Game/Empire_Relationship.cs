@@ -32,7 +32,7 @@ namespace Ship_Game
         public bool IsPacifist   => Personality == PersonalityType.Pacifist;
 
         public War[] AllActiveWars { get; private set; } = new War[0];
-        public Theater[] AllActiveWarTheaters { get; private set; } = new Theater[0];
+        public int ActiveWarPreparations { get; private set; } 
 
 
         void SignBilateralTreaty(Empire them, TreatyType type, bool value)
@@ -119,7 +119,7 @@ namespace Ship_Game
             float territorialism = 1 - (data.DiplomaticPersonality?.Territorialism ?? 100) / 100f;
             float militaryRatio  = Research.Strategy.MilitaryRatio;
             float opportunism    = data.DiplomaticPersonality?.Opportunism ?? 1;
-            return (1 + territorialism + militaryRatio + opportunism) / 4;
+            return (territorialism + militaryRatio + opportunism) / 3;
         }
 
         public float GetExpansionRatio()
@@ -132,7 +132,7 @@ namespace Ship_Game
             return (territorialism + expansion + opportunism + cybernetic);
         }
 
-        public void UpdateRelationships()
+        public void UpdateRelationships(bool takeTurn)
         {
             int atWarCount = 0;
             var wars = new Array<War>();
@@ -141,6 +141,11 @@ namespace Ship_Game
                 if (rel.Known || isPlayer)
                 {
                     rel.UpdateRelationship(this, them);
+                    if (takeTurn && !isFaction)
+                    {
+                        rel.AdvanceRelationshipTurn(this, them);
+                    }
+
                     if (rel.AtWar)
                     {
                         if (!them.isFaction)
@@ -148,45 +153,14 @@ namespace Ship_Game
                         wars.Add(rel.ActiveWar);
                     }
                 }
+                else if (!rel.Known)
+                {
+                    rel.CanAttack = true;
+                }
             }
             AllActiveWars = wars.ToArray();
+            ActiveWarPreparations = EmpireAI.Goals.Count(g => g.type == GoalType.PrepareForWar);
             AtWarCount = atWarCount;
-            var theaters = new Array<Theater>();
-            foreach (var war in AllActiveWars)
-            {
-                if (war.WarTheaters.ActiveTheaters?.Length > 0)
-                    theaters.AddRange(war.WarTheaters.ActiveTheaters);
-            }
-            AllActiveWarTheaters = theaters.ToArray();
-        }
-
-        void UpdateWarRallyPlanetsWonPlanet(Planet p, Empire enemy)
-        {
-            // todo - might need to transfer AO details, like core fleet so prevent issues later.
-            foreach (Theater theater in AllActiveWarTheaters.Filter(t => t.GetWar().Them == enemy))
-            {
-                War war = theater.GetWar();
-                if (war.WarType == WarType.SkirmishWar)
-                    continue;
-
-                Vector2 currentRallyCenter = theater.RallyAO.Center;
-                if (p.Center.SqDist(enemy.WeightedCenter) < currentRallyCenter.SqDist(enemy.WeightedCenter))
-                    theater.UpdateRallyAo(p);
-            }
-        }
-
-        void UpdateWarRallyPlanetsLostPlanet(Planet p, Empire enemy)
-        {
-            // todo - might need to transfer AO details, like core fleet so prevent issues later.
-            foreach (Theater theater in AllActiveWarTheaters.Filter(t => t.GetWar().Them == enemy))
-            {
-                War war = theater.GetWar();
-                if (war.WarType == WarType.SkirmishWar)
-                    continue;
-
-                if (theater.RallyAO.CoreWorld == p)
-                    theater.ResetRallyPoint();
-            }
         }
 
         public static void UpdateBilateralRelations(Empire us, Empire them)
@@ -197,17 +171,16 @@ namespace Ship_Game
 
         // The FlatMap is used for fast lookup
         // Active relations are used for iteration
-        readonly Array<OurRelationsToThem> RelationsMap = new Array<OurRelationsToThem>();
-        readonly Array<OurRelationsToThem> ActiveRelations = new Array<OurRelationsToThem>();
+        OurRelationsToThem[] RelationsMap = Empty<OurRelationsToThem>.Array;
+        OurRelationsToThem[] ActiveRelations = Empty<OurRelationsToThem>.Array;
 
-        public IReadOnlyList<OurRelationsToThem> AllRelations => ActiveRelations;
+        public OurRelationsToThem[] AllRelations => ActiveRelations;
         
         /// <returns>Get relations with another empire. NULL if there is no relations</returns> 
         public Relationship GetRelationsOrNull(Empire withEmpire)
         {
-
             int index = (withEmpire?.Id ?? int.MaxValue) - 1;
-            if (index < RelationsMap.Count)
+            if (index < RelationsMap.Length)
             {
                 OurRelationsToThem usToThem = RelationsMap[index];
                 if (usToThem.Them != null)
@@ -235,9 +208,10 @@ namespace Ship_Game
         void AddNewRelationToThem(Empire them, Relationship rel)
         {
             int index = them.Id - 1;
-            if (index >= RelationsMap.Count)
+            if (index >= RelationsMap.Length)
             {
-                RelationsMap.Resize(Math.Max(EmpireManager.NumEmpires, RelationsMap.Count));
+                int newSize = Math.Max(EmpireManager.NumEmpires, RelationsMap.Length);
+                Array.Resize(ref RelationsMap, newSize);
             }
 
             if (RelationsMap[index].Them != null)
@@ -245,7 +219,9 @@ namespace Ship_Game
             
             var usToThem = new OurRelationsToThem{ Them = them, Rel = rel };
             RelationsMap[index] = usToThem;
-            ActiveRelations.Add(usToThem);
+
+            Array.Resize(ref ActiveRelations, ActiveRelations.Length + 1);
+            ActiveRelations[ActiveRelations.Length - 1] = usToThem;
         }
         
         // TRUE if we know the other empire
@@ -276,6 +252,15 @@ namespace Ship_Game
                    || this == EmpireManager.Unknown
                    || WeAreRemnants
                    || (otherEmpire?.isFaction == true && !IsNAPactWith(otherEmpire));
+        }
+
+        public bool IsPreparingForWarWith(Empire otherEmpire)
+        {
+            if (this == otherEmpire)
+                return false;
+
+            Relationship rel = GetRelations(otherEmpire);
+            return !rel.AtWar && rel.PreparingForWar;
         }
 
         public bool IsAtWar => AllActiveWars.Length > 0;
@@ -452,7 +437,7 @@ namespace Ship_Game
                         rel.Trust -= 150 * multiplier;
                         rel.AddAngerDiplomaticConflict(75 * multiplier);
                         BreakAllianceWith(them);
-                        rel.PreparingForWar = true;
+                        rel.PrepareForWar(WarType.ImperialistWar, this);
                         if (IsAtWarWith(empireTheySignedWith))
                             GetRelations(empireTheySignedWith).RequestPeaceNow(this);
 
@@ -466,7 +451,7 @@ namespace Ship_Game
                     case PersonalityType.Cunning:
                         rel.AddAngerDiplomaticConflict(20 * multiplier);
                         rel.Trust -= 50 * multiplier;
-                        rel.PreparingForWar = true;
+                        rel.PrepareForWar(WarType.ImperialistWar, this);
                         if (treatySigned && IsAtWarWith(empireTheySignedWith))
                             SignPeaceWithEmpireTheySignedWith();
 
@@ -550,16 +535,6 @@ namespace Ship_Game
             DiplomacyContactQueue.Add(new KeyValuePair<int, string>(empire.Id, dialog));
         }
 
-        /// <summary>
-        /// Removes preparing for war from all relations.
-        /// Used to focus Ai on a single war preparations
-        /// </summary>
-        public void ResetPreparingForWar()
-        {
-            foreach (OurRelationsToThem rel in ActiveRelations)
-                rel.Rel.PreparingForWar = false;
-        }
-
         public float ColonizationDetectionChance(Relationship usToThem, Empire them)
         {
             int minChance = 0;
@@ -633,6 +608,18 @@ namespace Ship_Game
             }
 
             dialog = "JoinWar_Reject_TooDangerous";
+            return false;
+        }
+
+        public bool IsLosingInWarWith(Empire enemy)
+        {
+            Relationship relations = GetRelations(enemy);
+            if (relations.AtWar)
+            {
+                WarState state = relations.ActiveWar.GetWarScoreState();
+                return state == WarState.LosingBadly || state == WarState.LosingSlightly;
+            }
+
             return false;
         }
     }

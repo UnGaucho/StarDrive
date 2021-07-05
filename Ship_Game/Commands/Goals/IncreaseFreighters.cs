@@ -29,12 +29,10 @@ namespace Ship_Game.Commands.Goals
             if (!GetFreighter(out Ship freighter))
                 return GoalStep.GoalFailed;
 
-            if (!empire.FindPlanetToBuildAt(empire.SafeSpacePorts, freighter, out Planet planet))
+            if (!empire.FindPlanetToBuildAt(empire.SafeSpacePorts, freighter, out Planet planet, priority: 0.1f))
                 return GoalStep.GoalFailed;
 
             planet.Construction.Enqueue(freighter, this, notifyOnEmpty: false);
-            if (empire.IsIndustrialists || RandomMath.RollDie(empire.MaxFreightersInQueue) == 1)
-                planet.Construction.PrioritizeShip(freighter, 2, 5);
 
             return GoalStep.GoToNextStep;
         }

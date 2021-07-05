@@ -19,7 +19,7 @@ namespace Ship_Game.AI
             HasPriorityTarget = true;
             State             = AIState.Boarding;
             var escortTarget  = EscortTarget;
-            if (escortTarget == null || !escortTarget.Active || escortTarget.loyalty == Owner.loyalty)
+            if (Owner.TroopCount < 1 || escortTarget == null || !escortTarget.Active || escortTarget.loyalty == Owner.loyalty)
             {
                 ClearOrders(State);
                 if (Owner.IsHangarShip)
@@ -50,21 +50,23 @@ namespace Ship_Game.AI
             if (ship == null)
                 return false;
 
-            if (ship.Active && !ship.dying && !ship.IsInWarp && Owner.loyalty.IsEmpireAttackable(ship.GetLoyalty(), ship))
+            if (ship.Active && !ship.dying && !ship.IsInWarp &&
+                Owner.loyalty.IsEmpireAttackable(ship.loyalty, ship))
                 return true;
 
             return Owner.loyalty.isPlayer 
                    && HasPriorityTarget 
-                   && ship.inSensorRange // FB - this is only for the player, might be a bug
+                   && ship.InSensorRange
                    && !Owner.loyalty.IsAlliedWith(ship.loyalty);
         }
 
         Ship UpdateCombatTarget()
         {
-            if (IsTargetValid(Target)) return Target;
+            if (IsTargetValid(Target))
+                return Target;
 
-            Target = PotentialTargets.FirstOrDefault(t => IsTargetValid(t) 
-                                                          && t.Center.InRadius(Owner.Center, Owner.SensorRange));
+            Target = PotentialTargets.Find(t => IsTargetValid(t) 
+                                            && t.Center.InRadius(Owner.Center, Owner.SensorRange));
             return Target;
         }
 
@@ -73,15 +75,13 @@ namespace Ship_Game.AI
             Ship target = UpdateCombatTarget();
             if (target == null)
             {
-                DequeueCurrentOrder();
-                Owner.InCombat = false;
+                // this check here, in-case exit auto-combat logic already triggered
+                if (Owner.InCombat)
+                    ExitCombatState();
                 return;
             }
 
             AwaitClosest = null; // TODO: Why is this set here?
-            State = AIState.Combat;
-            Owner.InCombat = true;
-            Owner.InCombatTimer = 15f;
 
             if (!HasPriorityOrder && !HasPriorityTarget && Owner.Weapons.Count == 0 && !Owner.Carrier.HasActiveHangars)
                 CombatState = CombatState.Evade;
@@ -90,12 +90,10 @@ namespace Ship_Game.AI
             float distanceToTarget = target.Center.Distance(Owner.Center);
             if (HasPriorityOrder || distanceToTarget > Owner.DesiredCombatRange && distanceToTarget > 7500f)
             {
-                if (Owner.fleet == null || Owner.ShipEngines.ReadyForFormationWarp == Status.Good)
                 MoveToEngageTarget(target, timeStep);
             }
             else
             {
-
                 if (Owner.engineState == Ship.MoveState.Warp)
                     Owner.HyperspaceReturn();
 
@@ -107,7 +105,6 @@ namespace Ship_Game.AI
                         Vector2 nodePos = Owner.fleet.AveragePosition() + FleetNode.FleetOffset;
                         if (target.Center.OutsideRadius(nodePos, FleetNode.OrdersRadius))
                         {
-
                             if (Owner.Center.OutsideRadius(nodePos, 1000f))
                             {
                                 ThrustOrWarpToPos(nodePos, timeStep);
@@ -116,7 +113,6 @@ namespace Ship_Game.AI
                             {
                                 DoHoldPositionCombat(timeStep);
                             }
-
                             return;
                         }
                     }
@@ -142,26 +138,27 @@ namespace Ship_Game.AI
                         ThrustOrWarpToPos(target.Center, timeStep);
                         return;
                     }
-                    else if (distanceToTarget < Owner.DesiredCombatRange)
+                    if (distanceToTarget < Owner.DesiredCombatRange)
                         Intercepting = false;
                 }
 
                 CombatAI.ExecuteCombatTactic(timeStep);
+                Owner.Carrier.TryAssaultShipCombat();
             }
-            
-            // Target was modified by one of the CombatStates (?)
-            Owner.InCombat = Target != null;
         }
 
         void MoveToEngageTarget(Ship target, FixedSimTime timeStep)
         {
-            if (CombatRangeType == StanceType.RangedCombatMovement)
+            // TODO: ADD fleet formation warp logic here. 
+            if (CombatRangeType == StanceType.RangedCombatMovement )
             {
                 Vector2 prediction = target.Center;
                 Weapon fastestWeapon = Owner.FastestWeapon;
                 if (fastestWeapon != null && target.CurrentVelocity > 0) // if we have a weapon
                 {
-                    prediction = fastestWeapon.ProjectedImpactPointNoError(target);
+                    float distance = Owner.Center.Distance(target.Center);
+                    if (distance < 7500)
+                        prediction = fastestWeapon.ProjectedImpactPointNoError(target);
                 }
 
                 ThrustOrWarpToPos(prediction, timeStep);
@@ -429,17 +426,14 @@ namespace Ship_Game.AI
 
         void DoRepairDroneLogic(Weapon w)
         {
-            using (FriendliesNearby.AcquireReadLock())
-            {
-                Ship repairMe = FriendliesNearby.FindMinFiltered(
-                    filter: ship => ShipNeedsRepair(ship, ShipResupply.RepairDroneRange),
-                    selector: ship => ship.InternalSlotsHealthPercent);
+            Ship repairMe = FriendliesNearby.FindMinFiltered(
+                filter: ship => ShipNeedsRepair(ship, ShipResupply.RepairDroneRange),
+                selector: ship => ship.InternalSlotsHealthPercent);
 
-                if (repairMe == null) return;
-                Vector2 target = w.Origin.DirectionToTarget(repairMe.Center);
-                target.Y = target.Y * -1f;
-                w.FireDrone(target);
-            }
+            if (repairMe == null) return;
+            Vector2 target = w.Origin.DirectionToTarget(repairMe.Center);
+            target.Y = target.Y * -1f;
+            w.FireDrone(target);
         }
 
         void DoRepairBeamLogic(Weapon w)
@@ -482,6 +476,9 @@ namespace Ship_Game.AI
 
         void DoAssaultTransporterLogic(ShipModule module)
         {
+            if (NearByShips.IsEmpty)
+                return;
+
             ShipWeight ship = NearByShips.Where(
                     s => s.Ship.loyalty != null && s.Ship.loyalty != Owner.loyalty && s.Ship.shield_power <= 0
                          && s.Ship.Center.InRadius(Owner.Center, module.TransporterRange + 500f))
@@ -511,6 +508,10 @@ namespace Ship_Game.AI
                     GoOrbitNearestPlanetAndResupply(true);
                 return;
             }
+
+            if (Owner.DesignRole == ShipData.RoleName.drone && !Owner.InRadius(Owner.Mothership.Center, Owner.Mothership.SensorRange))
+                Owner.Die(null, true);
+
             ThrustOrWarpToPos(Owner.Mothership.Center, timeStep);
 
             if (Owner.Center.InRadius(Owner.Mothership.Center, Owner.Mothership.Radius + 300f))

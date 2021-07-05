@@ -11,7 +11,25 @@ namespace Ship_Game
     public partial class Planet
     {
         private readonly EnumFlatMap<ColonyPriority, float> Priorities = new EnumFlatMap<ColonyPriority, float>();
+        bool EmpireWillSupportBuild
+        {
+            get
+            {
+                float stability = Owner.GetEmpireAI().CreditRating;
+                return Owner.data.ColonyBudget > Owner.TotalBuildingMaintenance && stability > 0.9f;
+            }
+        }
 
+
+        bool EmpireWillPreventScrap
+        {
+            get
+            {
+                float scrapped = Owner.GetEmpireAI().MaintSavedByBuildingScrappedThisTurn;
+                float stability = Owner.GetEmpireAI().CreditRating;
+                return Owner.data.ColonyBudget > Owner.TotalBuildingMaintenance - scrapped || stability > 0.9f;
+            }
+        }
         private enum ColonyPriority
         {
             FoodFlat,
@@ -53,7 +71,7 @@ namespace Ship_Game
         void BuildAndScrapCivilianBuildings(float budget)
         {
             UpdateGovernorPriorities();
-            if (budget < 0f)
+            if (budget < 0f && !EmpireWillPreventScrap)
             {
                 TryScrapBuilding(); // We must scrap something to bring us above of our debt tolerance
             }
@@ -393,7 +411,8 @@ namespace Ship_Game
             }
 
             float maintenance = b.ActualMaintenance(this);
-            if (maintenance < budget || b.IsMoneyBuilding && b.MoneyBuildingAndProfitable(maintenance, PopulationBillion))
+
+            if ((budget > 0 && EmpireWillSupportBuild) || b.IsMoneyBuilding && b.MoneyBuildingAndProfitable(maintenance, PopulationBillion))
                 return true;
 
             return false; // Too expensive for us and its not getting profitable juice from the population
@@ -619,7 +638,7 @@ namespace Ship_Game
             shouldScrapBioSpheres = false;
 
             if (!Owner.IsBuildingUnlocked(Building.BiospheresId)
-                || PopulationRatio < 0.9f && HabitableBuiltCoverage.Less(1)
+                || PopulationRatio < 0.99f && HabitableBuiltCoverage.Less(1)
                 || BiosphereInTheWorks
                 || IsStarving
                 || HabitablePercentage.AlmostEqual(1)) // all tiles are habitable
@@ -637,7 +656,7 @@ namespace Ship_Game
                 if (numBio > 5)
                     shouldScrapBioSpheres = true;
 
-                if (numBio >= 5)
+                if (numBio >= 1)
                     return false;
             }
 

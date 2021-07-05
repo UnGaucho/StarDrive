@@ -9,7 +9,7 @@ namespace Ship_Game
 
         public float CurrentProductionToQueue   => Prod.NetIncome + InfraStructure;
         public float MaxProductionToQueue       => Prod.NetMaxPotential + InfraStructure;
-        public float EstimatedAverageProduction => (Prod.NetMaxPotential / (Owner.IsCybernetic ? 2 : 3)).LowerBound(0.1f);
+        public float EstimatedAverageProduction => (Prod.NetMaxPotential / (IsCybernetic ? 2 : 3)).LowerBound(0.1f);
         float EstimatedAverageFood              => (Food.NetMaxPotential / 3).LowerBound(0.1f);
 
         public void DoGoverning()
@@ -90,14 +90,15 @@ namespace Ship_Game
         {
             get
             {
-                if (Owner.Money < 1000)
+                if (Owner == null || Owner.Money < 1000)
                     return 0;
 
-                float debtTolerance = 3 * (1 - PopulationRatio); // the bigger the colony, the less debt tolerance it has, it should be earning money
-                if (MaxPopulationBillion < 2)
-                    debtTolerance += 2f - MaxPopulationBillion;
-
-                return debtTolerance.LowerBound(0); // Note - dept tolerance is a positive number added to the budget for small colonies
+                // Note - dept tolerance is a positive number added to the budget for founded colonies.
+                // The bigger the colony, the less debt tolerance it has, it should be earning money
+                // No debt tolerance if the colony has 50% pop or more.
+                float baseOverSpend = (1 - PopulationRatio*2).LowerBound(0);
+                float envOverSpend  = Empire.PreferredEnvModifier(Owner).LowerBound(0.5f);
+                return (baseOverSpend * envOverSpend).LowerBound(0);
             }
         }
 

@@ -13,18 +13,8 @@ namespace UnitTests.Ships
         {
             // Excalibur class has all the bells and whistles
             CreateGameInstance();
-            // TODO: we need to fix this mess with Supply Shuttles
-            LoadStarterShips(new[]{ "Excalibur-Class Supercarrier", "Corsair", "Supply Shuttle" });
-            
-        }
-
-        void CreateTestEnv(out Empire empire, out Ship ship, out Ship target)
-        {
-            CreateUniverseAndPlayerEmpire(out empire);
-            ship = CreateShip(empire, "Excalibur-Class Supercarrier", Vector2.Zero);
-            target = CreateShip(empire, "Corsair", new Vector2(1000, 1000));
-
-            Universe.Objects.Update(TestSimStep);
+            LoadStarterShips("Excalibur-Class Supercarrier", "Corsair", "Supply Shuttle");
+            CreateUniverseAndPlayerEmpire();
         }
 
         static Ship CreateShip(Empire empire, string shipName, Vector2 pos)
@@ -38,15 +28,17 @@ namespace UnitTests.Ships
         {
             ship.AI.CombatState = state;
             ship.shipStatusChanged = true;
-            ship.AI.StartSensorScan(TestSimStep);
-            
+            ship.AI.ScanForTargets(new FixedSimTime(1f));
             ship.Update(new FixedSimTime(1f));
         }
 
         [TestMethod]
         public void TestSupplyShuttle()
         {
-            CreateTestEnv(out Empire empire, out Ship ship, out Ship target);
+            Ship ship = CreateShip(Player, "Excalibur-Class Supercarrier", Vector2.Zero);
+            Ship target = CreateShip(Player, "Corsair", new Vector2(1000, 1000));
+            Universe.Objects.Update(TestSimStep);
+
             target.ChangeOrdnance(-target.OrdinanceMax * 0.5f);
             UpdateStatus(ship, CombatState.Artillery);
             ship.UpdateResupply();
@@ -56,7 +48,9 @@ namespace UnitTests.Ships
         [TestMethod]
         public void TestSelfSupplyShuttle()
         {
-            CreateTestEnv(out Empire empire, out Ship ship, out Ship target);
+            Ship ship = CreateShip(Player, "Excalibur-Class Supercarrier", Vector2.Zero);
+            Universe.Objects.Update(TestSimStep);
+
             ship.ChangeOrdnance(-(ship.OrdinanceMax -50));
             UpdateStatus(ship, CombatState.Artillery);
             ship.UpdateResupply();

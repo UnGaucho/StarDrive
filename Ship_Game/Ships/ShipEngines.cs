@@ -50,12 +50,15 @@ namespace Ship_Game.Ships
             return Status.Excellent;
         }
 
+        // need to think about how to organzie this. 
+        // i think we only need public value
         Status GetFormationWarpReadyStatus()
         {
-            if (Owner.fleet == null) return Status.NotApplicable;
+            if (Owner.fleet == null || Owner.AI.State != AIState.FormationWarp) 
+                return ReadyForWarp;
 
             if (!Owner.CanTakeFleetMoveOrders())
-                return Status.NotApplicable;
+                return ReadyForWarp;
 
             Status warpStatus = ReadyForWarp;
             if (Owner.engineState == Ship.MoveState.Warp)
@@ -65,10 +68,12 @@ namespace Ship_Game.Ships
                 if (warpStatus == Status.Critical) return Status.Good;
             }
 
-            if (Owner.fleet.GetSpeedLimitFor(Owner) < 1) return Status.NotApplicable;
+            float speedLimit = Owner.fleet.GetSpeedLimitFor(Owner);
+            if (speedLimit < 1 || speedLimit == float.MaxValue)
+                return Status.NotApplicable;
 
             Vector2 movePosition;
-            if (AI.OrderQueue.TryPeekFirst(out ShipAI.ShipGoal goal))
+            if (AI.OrderQueue.TryPeekFirst(out ShipAI.ShipGoal goal) && goal.MovePosition != Vector2.Zero)
             {
                 movePosition = goal.MovePosition;
             }
@@ -84,7 +89,6 @@ namespace Ship_Game.Ships
                 if (facingFleetDirection > 0.02)
                     warpStatus = Status.Poor;
             }
-            
             return warpStatus;
         }
 
@@ -106,10 +110,7 @@ namespace Ship_Game.Ships
             if (Owner.Carrier.RecallingFighters())
                 return Status.Poor;
 
-            if (!Owner.IsSpooling && Owner.WarpDuration() < Status.Good)
-                return Status.Poor;
-
-            return engineStatus;
+            return Owner.WarpRangeStatus(7500f);
         }
     }
 }

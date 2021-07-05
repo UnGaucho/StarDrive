@@ -192,7 +192,7 @@ namespace Ship_Game
                     for (int j = 0; j < SelectedFleet.Ships.Count; j++)
                     {
                         Ship ship = SelectedFleet.Ships[j];
-                        if (ship.inSensorRange)
+                        if (ship.InSensorRange)
                             SelectedShipList.AddUnique(ship);
                     }
                     if (SelectedShipList.Count == 1)
@@ -291,13 +291,10 @@ namespace Ship_Game
 
             ShowTacticalCloseup = input.TacticalIcons;
 
-            if (input.QuickSave)
+            if (input.QuickSave && !SavedGame.IsSaving)
             {
                 string saveName = $"Quicksave, {EmpireManager.Player.data.Traits.Name}, {StarDate.String()}";
-                RunOnEmpireThread(() =>
-                {
-                    var savedGame = new SavedGame(this, saveName);
-                });
+                RunOnEmpireThread(() => Save(saveName));
             }
 
             if (input.UseRealLights)
@@ -523,10 +520,10 @@ namespace Ship_Game
                 {
                     ViewingShip    = false;
                     AdjustCamTimer = 0.5f;
-                    CamDestination = SelectedFleet.AveragePosition().ToVec3();
+                    CamDestination = SelectedFleet.AveragePosition().ToVec3(CamDestination.Z);
 
                     if (CamHeight < GetZfromScreenState(UnivScreenState.SystemView))
-                        CamDestination.Z = GetZfromScreenState(UnivScreenState.SystemView);
+                        CamDestination.Z = GetZfromScreenState(UnivScreenState.PlanetView);
                 }
             }
         }
@@ -640,7 +637,7 @@ namespace Ship_Game
             {
                 if (!clickableShip.HitTest(input.CursorPosition))
                     continue;
-                if (clickableShip.shipToClick?.inSensorRange != true || pickedSomethingThisFrame)
+                if (clickableShip.shipToClick?.InSensorRange != true || pickedSomethingThisFrame)
                     continue;
 
                 pickedSomethingThisFrame = true;
@@ -805,7 +802,7 @@ namespace Ship_Game
         {
             fleet              = null;
             var potentialShips = new BatchRemovalCollection<Ship>();
-            var clickableShips = ClickableShipsList.Filter(cs => screenArea.HitTest(cs.ScreenPos));
+            var clickableShips = ClickableShipsList.Filter(cs => screenArea.HitTest(cs.ScreenPos) && cs.shipToClick?.InSensorRange == true);
 
             if (clickableShips.Length == 0)
                 return potentialShips;

@@ -12,7 +12,7 @@ namespace Ship_Game.Ships
     {
         // Added by RedFox - manual parsing of ShipData, because this is the slowest part
         // in loading, the brunt work is offloaded to C++ and then copied back into C#
-        static unsafe ShipData ParseXML(FileInfo info, bool isHullDefinition)
+        public static unsafe ShipData ParseXML(FileInfo info, bool isHullDefinition)
         {
             CShipDataParser* s = null;
             try
@@ -51,7 +51,7 @@ namespace Ship_Game.Ships
                     TechScore      = s->TechScore,
                     IsOrbitalDefense          = s->IsOrbitalDefense != 0,
                     SelectionGraphic          = s->SelectionGraphic.AsString,
-                    AllModulesUnlockable     = s->AllModulesUnlockable != 0,
+                    AllModulesUnlockable      = s->AllModulesUnlockable != 0,
                     MechanicalBoardingDefense = s->MechanicalBoardingDefense
                 };
                 Enum.TryParse(s->Role.AsString,              out ship.Role);

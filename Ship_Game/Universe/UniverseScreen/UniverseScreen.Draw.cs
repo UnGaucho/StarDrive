@@ -193,28 +193,28 @@ namespace Ship_Game
             }
         }
 
-        private void DrawInfluenceNodes()
+        void DrawInfluenceNodes(SpriteBatch batch)
         {
             var uiNode= ResourceManager.Texture("UI/node");
             var viewport = Viewport;
-            using (player.SensorNodes.AcquireReadLock())
-                foreach (Empire.InfluenceNode influ in player.SensorNodes)
-                {
-                    Vector2 screenPos = ProjectToScreenPosition(influ.Position);
-                    Vector3 local_4 = viewport.Project(
-                        new Vector3(influ.Position.PointFromAngle(90f, influ.Radius * 1.5f), 0.0f), Projection,
-                        View, Matrix.Identity);
 
-                    float local_6 = Math.Abs(new Vector2(local_4.X, local_4.Y).X - screenPos.X) * 2.59999990463257f;
-                    Rectangle local_7 = new Rectangle((int)screenPos.X, (int)screenPos.Y, (int)local_6, (int)local_6);
+            var sensorNodes = player.SensorNodes;
+            for (int i = 0; i < sensorNodes.Length; ++i)
+            {
+                ref Empire.InfluenceNode @in = ref sensorNodes[i];
+                Vector2 screenPos = ProjectToScreenPosition(@in.Position);
+                Vector3 local_4 = viewport.Project(
+                    new Vector3(@in.Position.PointFromAngle(90f, @in.Radius * 1.5f), 0.0f), Projection,
+                    View, Matrix.Identity);
 
-                    ScreenManager.SpriteBatch.Draw(uiNode, local_7, Color.White, 0.0f, uiNode.CenterF, SpriteEffects.None, 1f);
-                }
+                float local_6 = Math.Abs(new Vector2(local_4.X, local_4.Y).X - screenPos.X) * 2.59999990463257f;
+                Rectangle local_7 = new Rectangle((int)screenPos.X, (int)screenPos.Y, (int)local_6, (int)local_6);
+
+                batch.Draw(uiNode, local_7, Color.White, 0.0f, uiNode.CenterF, SpriteEffects.None, 1f);
+            }
         }
 
-
-
-        private void DrawColoredEmpireBorders(SpriteBatch batch, GraphicsDevice graphics)
+        void DrawColoredEmpireBorders(SpriteBatch batch, GraphicsDevice graphics)
         {
             DrawBorders.Start();
 
@@ -230,44 +230,43 @@ namespace Ship_Game
             var nodeCorrected = ResourceManager.Texture("UI/nodecorrected");
             var nodeConnect = ResourceManager.Texture("UI/nodeconnect");
 
-            foreach (Empire empire in EmpireManager.Empires.Sorted(e=> e.MilitaryScore))
+            Empire[] empires = EmpireManager.Empires.Sorted(e=> e.MilitaryScore);
+            foreach (Empire empire in empires)
             {
                 if (!Debug && empire != player && !player.IsKnown(empire))
                     continue;
 
-                var empireColor = empire.EmpireColor;
+                Color empireColor = empire.EmpireColor;
+                Empire.InfluenceNode[] nodes = empire.BorderNodes;
+                for (int x = 0; x < nodes.Length; x++)
                 {
-                    var nodes = empire.BorderNodes.AtomicCopy();
-                    for (int x = 0; x < nodes.Length; x++)
+                    ref Empire.InfluenceNode @in = ref nodes[x];
+                    if (!@in.KnownToPlayer)
+                        continue;
+                    if (!Frustum.Contains(@in.Position, @in.Radius))
+                        continue;
+             
+                    Vector2 nodePos = ProjectToScreenPosition(@in.Position);
+                    int size = (int) Math.Abs(
+                        ProjectToScreenPosition(@in.Position.PointFromAngle(90f, @in.Radius)).X - nodePos.X);
+
+                    var rect = new Rectangle((int) nodePos.X, (int) nodePos.Y, size * 5, size * 5);
+                    batch.Draw(nodeCorrected, rect, empireColor, 0.0f, nodeCorrected.CenterF, SpriteEffects.None, 1f);
+
+                    for (int i = 0; i < nodes.Length; i++)
                     {
-                        Empire.InfluenceNode influ = nodes[x];
-                        if (influ?.KnownToPlayer != true)
+                        ref Empire.InfluenceNode in2 = ref nodes[i];
+                        if (!in2.KnownToPlayer)
                             continue;
-                        if (!Frustum.Contains(influ.Position, influ.Radius))
+                        if (@in.Position == in2.Position || @in.Radius > in2.Radius ||
+                            @in.Position.OutsideRadius(in2.Position, @in.Radius + in2.Radius + 150000.0f))
                             continue;
-                 
-                        Vector2 nodePos = ProjectToScreenPosition(influ.Position);
-                        int size = (int) Math.Abs(
-                            ProjectToScreenPosition(influ.Position.PointFromAngle(90f, influ.Radius)).X - nodePos.X);
 
-                        Rectangle rect = new Rectangle((int) nodePos.X, (int) nodePos.Y, size * 5, size * 5);
-                        batch.Draw(nodeCorrected, rect, empireColor, 0.0f, nodeCorrected.CenterF, SpriteEffects.None, 1f);
-
-                        for (int i = 0; i < nodes.Length; i++)
-                        {
-                            Empire.InfluenceNode influ2 = nodes[i];
-                            if (influ2?.KnownToPlayer != true)
-                                continue;
-                            if (influ.Position == influ2.Position || influ.Radius > influ2.Radius ||
-                                influ.Position.OutsideRadius(influ2.Position, influ.Radius + influ2.Radius + 150000.0f))
-                                continue;
-
-                            Vector2 endPos = ProjectToScreenPosition(influ2.Position);
-                            float rotation = nodePos.RadiansToTarget(endPos);
-                            rect = new Rectangle((int) endPos.X, (int) endPos.Y, size * 3 / 2,
-                                (int) nodePos.Distance(endPos));
-                            batch.Draw(nodeConnect, rect, empireColor, rotation, new Vector2(2f, 2f), SpriteEffects.None, 1f);
-                        }
+                        Vector2 endPos = ProjectToScreenPosition(in2.Position);
+                        float rotation = nodePos.RadiansToTarget(endPos);
+                        rect = new Rectangle((int) endPos.X, (int) endPos.Y, size * 3 / 2,
+                            (int) nodePos.Distance(endPos));
+                        batch.Draw(nodeConnect, rect, empireColor, rotation, new Vector2(2f, 2f), SpriteEffects.None, 1f);
                     }
                 }
             }
@@ -306,9 +305,12 @@ namespace Ship_Game
 
             if (ShowShipNames && !LookingAtPlanet)
             {
-                foreach (ClickableShip clickable in ClickableShipsList)
-                    if (clickable.shipToClick.InFrustum)
+                for (int i = 0; i < ClickableShipsList.Count; i++)
+                {
+                    ClickableShip clickable = ClickableShipsList[i];
+                    if (clickable.shipToClick.IsVisibleToPlayer)
                         clickable.shipToClick.DrawShieldBubble(this);
+                }
             }
 
             DrawMain3D.Stop();
@@ -327,15 +329,15 @@ namespace Ship_Game
             var ships = player.OwnedShips;
             foreach (Ship ship in ships)
             {
-                if (ship != null && ScreenRectangle.HitTest(ship.ScreenPosition))
+                if (ship != null && ship.InFrustum)
                 {
                     Rectangle destinationRectangle = new Rectangle(
                         (int) (ship.Position.X * num),
                         (int) (ship.Position.Y * num),
                         (int) (ship.SensorRange * num * 2.0),
                         (int) (ship.SensorRange * num * 2.0));
-                    ScreenManager.SpriteBatch.Draw(uiNode, destinationRectangle, new Color(255, 0, 0, 255), 0.0f,
-                        uiNode.CenterF, SpriteEffects.None, 1f);
+                    batch.Draw(uiNode, destinationRectangle, new Color(255, 0, 0, 255), 0.0f,
+                               uiNode.CenterF, SpriteEffects.None, 1f);
                 }
             }
             batch.End();
@@ -353,7 +355,7 @@ namespace Ship_Game
                 batch.Draw(FogMap, fogRect, new Color(255, 255, 255, 55));
             }
             DrawFogNodes();
-            DrawInfluenceNodes();
+            DrawInfluenceNodes(batch);
             batch.End();
             device.SetRenderTarget(0, null);
 
@@ -568,7 +570,7 @@ namespace Ship_Game
                 foreach (ClickableShip clickable in ClickableShipsList)
                 {
                     Ship ship = clickable.shipToClick;
-                    if (ship != null && ship.WeaponsMaxRange > 0f)
+                    if (ship != null &&  ship.IsVisibleToPlayer && ship.WeaponsMaxRange > 0f)
                     {
                         Color color = ship.loyalty == EmpireManager.Player
                                         ? new Color(0, 200, 0, 30)
@@ -628,10 +630,14 @@ namespace Ship_Game
 
                 if (viewState >= UnivScreenState.SectorView)
                 {
-                    foreach (Empire.InfluenceNode influ in player.BorderNodes.AtomicCopy())
+                    var transparentBlue = new Color(30, 30, 150, 150);
+                    var transparentGreen = new Color(0, 200, 0, 20);
+                    Empire.InfluenceNode[] borders = player.BorderNodes;
+                    for (int i = 0; i < borders.Length; ++i)
                     {
-                        DrawCircleProjected(influ.Position, influ.Radius, new Color(30, 30, 150, 150), 1f, inhibit,
-                            new Color(0, 200, 0, 20));
+                        ref Empire.InfluenceNode @in = ref borders[i];
+                        DrawCircleProjected(@in.Position, @in.Radius, transparentBlue, 1f, inhibit,
+                                            transparentGreen);
                     }
                 }
             }
@@ -768,50 +774,31 @@ namespace Ship_Game
 
         void DrawTacticalPlanetIcons(SpriteBatch batch)
         {
-            if (LookingAtPlanet || viewState <= UnivScreenState.SystemView
-                ||viewState >= UnivScreenState.GalaxyView)
+            if (LookingAtPlanet || viewState <= UnivScreenState.SystemView || viewState >= UnivScreenState.GalaxyView)
                 return;
 
-            foreach (SolarSystem solarSystem in SolarSystemList)
+            for (int i = 0; i < SolarSystemList.Count; i++)
             {
-                bool wellKnown = false;
-
-                foreach (Empire e in solarSystem.OwnerList)
-                {
-                    EmpireManager.Player.GetRelations(e, out Relationship ssRel);
-                    wellKnown = Debug || e.isPlayer || ssRel.Treaty_Alliance;
-                    if (wellKnown) break;
-
-                }
-                if (!solarSystem.IsExploredBy(player))
+                SolarSystem system = SolarSystemList[i];
+                if (!system.IsExploredBy(player) || !system.IsVisible)
                     continue;
 
-                foreach (Planet planet in solarSystem.PlanetList)
+                foreach (Planet planet in system.PlanetList)
                 {
-                    if (!wellKnown && planet.Owner != null)
-                    {
-                        Empire e = planet.Owner;
-                        if (EmpireManager.Player.IsKnown(e))
-                            wellKnown = true;
-                    }
+                    float fIconScale      = 0.1875f * (0.7f + ((float) (Math.Log(planet.Scale)) / 2.75f));
+                    Vector2 planetIconPos = ProjectToScreenPosition(planet.Center, 2500);
+                    Vector2 flagIconPos   = planetIconPos - new Vector2(0, 15);
 
-                    float fIconScale = 0.1875f * (0.7f + ((float) (Math.Log(planet.Scale)) / 2.75f));
-
-                    Vector3 vector3 = Viewport.Project(new Vector3(planet.Center, 2500f), Projection, View, Matrix.Identity);
-                    var position = new Vector2(vector3.X, vector3.Y);
                     SubTexture planetTex = planet.PlanetTexture;
-
-                    if (planet.Owner != null && wellKnown)
+                    if (planet.Owner != null && (player.IsKnown(planet.Owner) || planet.Owner == player))
                     {
-                        batch.Draw(planetTex, position, Color.White,
-                                   0.0f, planetTex.CenterF, fIconScale, SpriteEffects.None, 1f);
+                        batch.Draw(planetTex, planetIconPos, Color.White, 0.0f, planetTex.CenterF, fIconScale, SpriteEffects.None, 1f);
                         SubTexture flag = ResourceManager.Flag(planet.Owner);
-                        batch.Draw(flag, position, planet.Owner.EmpireColor, 0.0f, flag.CenterF, 0.045f, SpriteEffects.None, 1f);
+                        batch.Draw(flag, flagIconPos, planet.Owner.EmpireColor, 0.0f, flag.CenterF, 0.2f, SpriteEffects.None, 1f);
                     }
                     else
                     {
-                        batch.Draw(planetTex, position, Color.White,
-                                   0.0f, planetTex.CenterF, fIconScale, SpriteEffects.None, 1f);
+                        batch.Draw(planetTex, planetIconPos, Color.White, 0.0f, planetTex.CenterF, fIconScale, SpriteEffects.None, 1f);
                     }
                 }
             }
@@ -1043,10 +1030,11 @@ namespace Ship_Game
             for (int i = 0; i < ships.Length; ++i)
             {
                 Ship ship = ships[i];
-                if (ship.inSensorRange)
+                if (ship.InFrustum && ship.InSensorRange)
                 {
                     if (!IsCinematicModeEnabled)
                         DrawTacticalIcon(ship);
+
                     DrawOverlay(ship);
 
                     if (SelectedShip == ship || SelectedShipList.Contains(ship))
@@ -1054,7 +1042,12 @@ namespace Ship_Game
                         Color color = Color.LightGreen;
                         if (player != ship.loyalty)
                             color = player.IsEmpireAttackable(ship.loyalty) ? Color.Red : Color.Gray;
-                        batch.BracketRectangle(ship.ScreenPosition, ship.ScreenRadius, color);
+
+                        ProjectToScreenCoords(ship.Position, ship.Radius,
+                            out Vector2 shipScreenPos, out float screenRadius);
+
+                        float radius = screenRadius < 7f ? 7f : screenRadius;
+                        batch.BracketRectangle(shipScreenPos, radius, color);
                     }
                 }
             }
@@ -1205,20 +1198,21 @@ namespace Ship_Game
                 DrawLineProjected(start, ship.AI.EscortTarget.Center, Colors.CombatOrders(alpha));
                 return;
             }
-            if (ship.AI.State == AIState.AssaultPlanet && ship.AI.OrbitTarget != null)
+
+            var planet = ship.AI.OrbitTarget;
+            if (ship.AI.State == AIState.AssaultPlanet && planet != null)
             {
-                var planet = ship.AI.OrbitTarget;
                 int spots = planet.GetFreeTiles(EmpireManager.Player);
                 if (spots > 4)
-                    DrawLineToPlanet(start, ship.AI.OrbitTarget.Center, Colors.CombatOrders(alpha));
+                    DrawLineToPlanet(start, planet.Center, Colors.CombatOrders(alpha));
                 else if (spots > 0)
                 {
-                    DrawLineToPlanet(start, ship.AI.OrbitTarget.Center, Colors.Warning(alpha));
+                    DrawLineToPlanet(start, planet.Center, Colors.Warning(alpha));
                     ToolTip.PlanetLandingSpotsTip($"{planet.Name}: Warning!", spots);
                 }
                 else
                 {
-                    DrawLineToPlanet(start, ship.AI.OrbitTarget.Center, Colors.Error(alpha));
+                    DrawLineToPlanet(start, planet.Center, Colors.Error(alpha));
                     ToolTip.PlanetLandingSpotsTip($"{planet.Name}: Critical!", spots);
                 }
                 DrawWayPointLines(ship, new Color(Color.Lime, alpha));
@@ -1296,29 +1290,18 @@ namespace Ship_Game
             for (int k = 0; k < SolarSystemList.Count; k++)
             {
                 SolarSystem solarSystem = SolarSystemList[k];
-                if (!solarSystem.isVisible)
+                if (!solarSystem.IsExploredBy(player) || !solarSystem.IsVisible)
                     continue;
-
-                bool wellKnown = false;
-
-                foreach (Empire e in solarSystem.OwnerList)
-                {
-                    wellKnown = Debug || EmpireManager.Player == e || EmpireManager.Player.IsAlliedWith(e);
-                    if (wellKnown) break;
-                }
 
                 for (int j = 0; j < solarSystem.PlanetList.Count; j++)
                 {
                     Planet planet = solarSystem.PlanetList[j];
-                    if (!planet.IsExploredBy(player) && !wellKnown)
-                        continue;
-
                     Vector2 screenPosPlanet = ProjectToScreenPosition(planet.Center, 2500f);
                     Vector2 posOffSet = screenPosPlanet;
                     posOffSet.X += 20f;
                     posOffSet.Y += 37f;
                     int drawLocationOffset = 0;
-                    Color textColor = wellKnown ? planet.Owner?.EmpireColor ?? Color.White : Color.White;
+                    Color textColor = planet.Owner?.EmpireColor ?? Color.Gray;
 
                     DrawPointerWithText(screenPosPlanet, planetNamePointer, Color.Green, planet.Name, textColor);
 

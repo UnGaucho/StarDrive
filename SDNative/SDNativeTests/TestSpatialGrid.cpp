@@ -8,7 +8,7 @@ TestImpl(TestGrid)
     {
     }
 
-    TestCase(update_perf)
+    TestCase(rebuild)
     {
         SimParams p {};
         SpatialWithObjects swo = createSpatialWithObjects(spatial::SpatialType::Grid, p);
@@ -19,7 +19,7 @@ TestImpl(TestGrid)
         });
     }
 
-    TestCase(search_perf)
+    TestCase(findNearby)
     {
         SimParams p {};
         SpatialWithObjects swo = createSpatialWithObjects(spatial::SpatialType::Grid, p);
@@ -33,11 +33,11 @@ TestImpl(TestGrid)
             opt.MaxResults = 1024;
             opt.Exclude = o.spatialId;
             opt.ExcludeLoyalty = o.loyalty;
-            int n = swo.spatial->findNearby(results.data(), opt);
+            int n = swo.spatial->findNearby(swo.root, results.data(), opt);
         });
     }
 
-    TestCase(collision_perf)
+    TestCase(collideAll)
     {
         SimParams p {};
         p.numObjects = 100'000;
@@ -47,7 +47,7 @@ TestImpl(TestGrid)
 
         measureIterations("Grid::collideAll", 10, swo.objects.size(), [&]()
         {
-            swo.spatial->collideAll({});
+            swo.spatial->collideAll(swo.root, {});
         });
     }
 };

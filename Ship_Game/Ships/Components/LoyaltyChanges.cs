@@ -5,127 +5,137 @@ namespace Ship_Game.Ships.Components
 {
     public class LoyaltyChanges
     {
-        Empire BoardedShipNewLoyalty;
-        Empire LoyaltyForSpawnedShip;
-        Empire AbsorbedShipNewLoyalty;
-        bool AddNotification = false;
-        IEmpireShipLists CurrentEmpire;
-        public Empire ShipOwner { get; private set; }
-
-        readonly Ship Owner;
-
-        public LoyaltyChanges(Ship ship, Empire empire)
+        enum Type
         {
-            Owner = ship;
-            LoyaltyForSpawnedShip = empire;
-            CurrentEmpire = empire;
-            ShipOwner = empire;
+            None,
+            Spawn,
+            Boarded, BoardedNotify,
+            Absorbed, AbsorbedNotify
         }
 
-        public void SetBoardingLoyalty(Empire empire, bool addNotification = true)
+        Empire ChangeTo;
+        Type ChangeType;
+
+        public LoyaltyChanges(Ship ship, Empire loyalty)
         {
-            BoardedShipNewLoyalty = empire;
-            AddNotification       = addNotification;
+            ship.loyalty = loyalty;
+            ChangeTo = null;
+            ChangeType = Type.None;
         }
 
-        public void SetLoyaltyForNewShip(Empire empire, bool addNotification = true)
+        // Need to use this as a proxy because of
+        // ship.loyalty => LoyaltyTracker.CurrentLoyalty;
+        // Classic chicken-egg paradox
+        public void OnSpawn(Ship ship)
         {
-            LoyaltyForSpawnedShip = empire;
-            AddNotification = addNotification;
+            if (ship.loyalty != EmpireManager.Void)
+                LoyaltyChangeDueToSpawn(ship, ship.loyalty);
         }
 
-        public void SetLoyaltyForAbsorbedShip(Empire empire, bool addNotification = true)
+        // Loyalty change is ignored if loyalty == CurrentLoyalty
+        public void SetLoyaltyForNewShip(Empire loyalty)
         {
-            AbsorbedShipNewLoyalty = empire;
-            AddNotification = addNotification;
+            ChangeTo = loyalty;
+            ChangeType = Type.Spawn;
         }
 
-        void SetCurrentLoyalty(Empire empire)
+        public void SetBoardingLoyalty(Empire loyalty, bool addNotification = true)
         {
-            CurrentEmpire = empire;
-            ShipOwner     = empire;
+            ChangeTo = loyalty;
+            ChangeType = addNotification ? Type.BoardedNotify : Type.Boarded;
         }
-        public bool ApplyAnyLoyaltyChanges()
+
+        public void SetLoyaltyForAbsorbedShip(Empire loyalty, bool addNotification = true)
         {
-            bool loyaltyChanged = false;
-            if (BoardedShipNewLoyalty != null)
-            {
-                loyaltyChanged |= LoyaltyChangeDueToBoarding(AddNotification); ;
-            }
-            if (LoyaltyForSpawnedShip != null)
-            {
-                SetCurrentLoyalty(LoyaltyForSpawnedShip);
-                CurrentEmpire.AddNewShipAtEndOfTurn(Owner);
-                LoyaltyForSpawnedShip = null;
-                loyaltyChanged = true;
-            }
-            if (AbsorbedShipNewLoyalty != null)
-            {
-                LoyaltyChangeDueToFederation(AddNotification);
-                AbsorbedShipNewLoyalty = null;
-                loyaltyChanged = true;
-            }
+            ChangeTo = loyalty;
+            ChangeType = addNotification ? Type.AbsorbedNotify : Type.Absorbed;
+        }
+
+        /// <returns>TRUE if loyalty changed</returns>
+        public bool Update(Ship ship)
+        {
+            Empire changeTo = ChangeTo;
+            if (changeTo == null || changeTo == ship.loyalty)
+                return false;
+
+            Type type = ChangeType;
+            ChangeTo = null;
+            ChangeType = Type.None;
+            bool loyaltyChanged = DoLoyaltyChange(ship, type, changeTo);
+            if (loyaltyChanged)
+                ship.loyalty.AddShipToManagedPools(ship);
             return loyaltyChanged;
         }
 
-        bool LoyaltyChangeDueToBoarding(bool notification)
+        static bool DoLoyaltyChange(Ship ship, Type type, Empire changeTo)
         {
-            var ship = Owner;
-            Empire oldLoyalty = ship.loyalty;
-            oldLoyalty.TheyKilledOurShip(BoardedShipNewLoyalty, ship);
-            BoardedShipNewLoyalty.WeKilledTheirShip(oldLoyalty, ship);
-            // remove ship from fleet but do not add it back to empire pools.
-            ship.fleet?.RemoveShip(ship, false);
-            ship.AI.ClearOrders();
+            switch (type)
+            {
+                default:
+                case Type.None: return false;
+                case Type.Spawn:          LoyaltyChangeDueToSpawn(ship, changeTo);             return true;
+                case Type.Boarded:        LoyaltyChangeDueToBoarding(ship, changeTo, false);   return true;
+                case Type.BoardedNotify:  LoyaltyChangeDueToBoarding(ship, changeTo, true);    return true;
+                case Type.Absorbed:       LoyaltyChangeDueToFederation(ship, changeTo, false); return true;
+                case Type.AbsorbedNotify: LoyaltyChangeDueToFederation(ship, changeTo, true);  return true;
+            }
+        }
 
-            SetCurrentLoyalty(BoardedShipNewLoyalty);
-            oldLoyalty.GetEmpireAI().ThreatMatrix.RemovePin(ship);
-            ship.shipStatusChanged = true;
-            ship.SwitchTroopLoyalty(oldLoyalty, ship.loyalty);
-            ship.ReCalculateTroopsAfterBoard();
-            ship.ScuttleTimer = -1f; // Cancel any active self destruct
-            ship.PiratePostChangeLoyalty();
-            ship.IsGuardian = BoardedShipNewLoyalty.WeAreRemnants;
+        static void LoyaltyChangeDueToSpawn(Ship ship, Empire newLoyalty)
+        {
+            ship.loyalty = newLoyalty;
+            IEmpireShipLists newShips = newLoyalty;
+            newShips.AddNewShipAtEndOfTurn(ship);
+        }
+
+        static void LoyaltyChangeDueToBoarding(Ship ship, Empire newLoyalty, bool notification)
+        {
+            Empire oldLoyalty = ship.loyalty;
+            oldLoyalty.TheyKilledOurShip(newLoyalty, ship);
+            newLoyalty.WeKilledTheirShip(oldLoyalty, ship);
+            SafelyTransferShip(ship, oldLoyalty, newLoyalty);
 
             if (notification)
             {
-                BoardedShipNewLoyalty.AddBoardSuccessNotification(ship);
-                oldLoyalty.AddBoardedNotification(ship,BoardedShipNewLoyalty);
+                newLoyalty.AddBoardSuccessNotification(ship);
+                oldLoyalty.AddBoardedNotification(ship, newLoyalty);
             }
-
-            CurrentEmpire.AddNewShipAtEndOfTurn(ship);
-            ((IEmpireShipLists) oldLoyalty).RemoveShipAtEndOfTurn(ship);
-
-            BoardedShipNewLoyalty = null;
-            return true;
         }
 
-        bool LoyaltyChangeDueToFederation(bool notification)
+        static void LoyaltyChangeDueToFederation(Ship ship, Empire newLoyalty, bool notification)
         {
-            var ship = Owner;
             Empire oldLoyalty = ship.loyalty;
-            // remove ship from fleet but do not add it back to empire pools.
-            ship.fleet?.RemoveShip(ship, false);
-            ship.AI.ClearOrders();
-
-            SetCurrentLoyalty(AbsorbedShipNewLoyalty);
-            ship.shipStatusChanged = true;
-            ship.SwitchTroopLoyalty(oldLoyalty, ship.loyalty);
-            ship.ScuttleTimer = -1f; // Cancel any active self destruct
-            ship.PiratePostChangeLoyalty();
-            ship.IsGuardian = AbsorbedShipNewLoyalty.WeAreRemnants;
+            SafelyTransferShip(ship, oldLoyalty, newLoyalty);
 
             // TODO: change to absorbed ship notification
             if (notification)
             {
-                BoardedShipNewLoyalty.AddBoardSuccessNotification(ship);
-                oldLoyalty.AddBoardedNotification(ship, BoardedShipNewLoyalty);
+                newLoyalty.AddBoardSuccessNotification(ship);
             }
+        }
 
-            CurrentEmpire.AddNewShipAtEndOfTurn(ship);
+        static void SafelyTransferShip(Ship ship, Empire oldLoyalty, Empire newLoyalty)
+        {
+            // remove ship from fleet but do not add it back to empire pools.
+            ship.fleet?.RemoveShip(ship, false);
+            ship.AI.ClearOrders();
 
-            AbsorbedShipNewLoyalty = null;
-            return true;
+            ship.loyalty = newLoyalty;
+
+            oldLoyalty.GetEmpireAI().ThreatMatrix.RemovePin(ship);
+            ship.shipStatusChanged = true;
+            ship.SwitchTroopLoyalty(oldLoyalty, newLoyalty);
+            ship.ReCalculateTroopsAfterBoard();
+            ship.ScuttleTimer = -1f; // Cancel any active self destruct
+            ship.PiratePostChangeLoyalty();
+            ship.IsGuardian = newLoyalty.WeAreRemnants;
+
+            IEmpireShipLists oldShips = oldLoyalty;
+            IEmpireShipLists newShips = newLoyalty;
+            
+            oldShips.RemoveShipAtEndOfTurn(ship);
+            oldLoyalty.RemoveShipFromAIPools(ship);
+            newShips.AddNewShipAtEndOfTurn(ship);;
         }
     }
 }

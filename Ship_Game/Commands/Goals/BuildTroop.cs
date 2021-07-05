@@ -36,15 +36,11 @@ namespace Ship_Game.Commands.Goals
 
             // find a planet
             Troop troopTemplate = ResourceManager.GetTroopTemplate(ToBuildUID);
-            if (empire.FindPlanetToBuildTroopAt(empire.MilitaryOutposts, troopTemplate, out Planet planet))
+            if (empire.FindPlanetToBuildTroopAt(empire.MilitaryOutposts, troopTemplate, out Planet planet, priority: 0.1f))
             {
-                if (planet.ConstructionQueue.Count(q => q.isTroop) >= 2)
-                    return GoalStep.TryAgain;
-
                 // submit troop into queue
+                // let the colony governor prioritize troops
                 planet.Construction.Enqueue(troopTemplate, this);
-                if (RandomMath.RollDice(50 - troopRatio * 100) && !planet.HasColonyShipFirstInQueue())
-                    planet.Construction.PrioritizeTroop();
 
                 PlanetBuildingAt = planet;
                 return GoalStep.GoToNextStep;

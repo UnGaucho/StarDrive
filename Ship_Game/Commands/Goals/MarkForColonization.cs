@@ -111,7 +111,7 @@ namespace Ship_Game.Commands.Goals
 
             if (TryGetClaimTask(out MilitaryTask task))
             {
-                if (!PositiveEnemyPresence(out float enemyStr) || task.Fleet?.TaskStep == 9)
+                if (!PositiveEnemyPresence(out float enemyStr) || task.Fleet != null && task.Fleet.TaskStep == 9)
                     return GoalStep.GoToNextStep;
 
                 if (enemyStr > empire.OffensiveStrength)
@@ -146,10 +146,12 @@ namespace Ship_Game.Commands.Goals
             if (!ShipBuilder.PickColonyShip(empire, out Ship colonyShip))
                 return GoalStep.GoalFailed;
 
-            if (!empire.FindPlanetToBuildAt(empire.SafeSpacePorts, colonyShip, out Planet planet))
+            if (!empire.FindPlanetToBuildAt(empire.SafeSpacePorts, colonyShip, out Planet planet, priority: 1.00f))
                 return GoalStep.TryAgain;
 
-            planet.Construction.Enqueue(colonyShip, this, notifyOnEmpty:empire.isPlayer);
+            planet.Construction.Enqueue(colonyShip, this, notifyOnEmpty:empire.isPlayer,
+                displayName: $"{colonyShip.Name} ({ColonizationTarget.Name})");
+
             planet.Construction.PrioritizeShip(colonyShip, 1);
             return GoalStep.GoToNextStep;
         }
@@ -161,6 +163,7 @@ namespace Ship_Game.Commands.Goals
                 if (TryGetClaimTask(out MilitaryTask task))
                     task.EndTask();
 
+                PlanetBuildingAt?.Construction.Cancel(this);
                 return GoalStep.GoalFailed;
             }
 

@@ -34,6 +34,17 @@ namespace Ship_Game.Ships
 
         public FileInfo Source;
 
+        public HullSlot FindSlot(Point p)
+        {
+            for (int i = 0; i < HullSlots.Length; ++i)
+            {
+                var slot = HullSlots[i];
+                if (slot.P == p)
+                    return slot;
+            }
+            return null;
+        }
+
         public ShipHull()
         {
         }
@@ -42,7 +53,7 @@ namespace Ship_Game.Ships
         public ShipHull(ShipData sd)
         {
             HullName = sd.Hull;
-            ModName = sd.ModName;
+            ModName = sd.ModName ?? "";
             Style = sd.ShipStyle;
             Size = sd.GridInfo.Size;
             Area = sd.GridInfo.SurfaceArea;
@@ -66,10 +77,13 @@ namespace Ship_Game.Ships
                                             (int)(pos.Y / 16f),
                                             msd.Restrictions);
             }
+
+            Array.Sort(HullSlots, HullSlot.Sorter);
         }
 
         public ShipHull(FileInfo file)
         {
+            ModName = "";
             Source = file;
 
             string[] lines = File.ReadAllLines(file.FullName);

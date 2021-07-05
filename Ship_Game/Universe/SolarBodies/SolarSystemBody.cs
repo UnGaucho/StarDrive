@@ -159,7 +159,7 @@ namespace Ship_Game
         public BatchRemovalCollection<Combat> ActiveCombats = new BatchRemovalCollection<Combat>();
         public BatchRemovalCollection<OrbitalDrop> OrbitalDropList = new BatchRemovalCollection<OrbitalDrop>();
         public BatchRemovalCollection<Troop> TroopsHere = new BatchRemovalCollection<Troop>();
-        protected readonly Array<Building> BuildingsCanBuild = new Array<Building>();
+        protected Array<Building> BuildingsCanBuild = new Array<Building>();
         public bool IsConstructing => Construction.NotEmpty;
         public bool NotConstructing => Construction.Empty;
         public int NumConstructing => Construction.Count;
@@ -307,11 +307,11 @@ namespace Ship_Game
             return Habitable ? " None" : " Uninhabitable";
         }
 
-        public void InitializePlanetMesh(GameScreen screen)
+        public void InitializePlanetMesh()
         {
             Shield = ShieldManager.AddPlanetaryShield(Center);
             UpdateDescription();
-            CreatePlanetSceneObject(screen);
+            CreatePlanetSceneObject();
 
             GravityWellRadius = (float)(GlobalStats.GravityWellRange * (1 + ((Math.Log(Scale)) / 1.5)));
         }
@@ -319,7 +319,7 @@ namespace Ship_Game
         protected void UpdatePosition(FixedSimTime timeStep)
         {
             PosUpdateTimer -= timeStep.FixedTime;
-            if (!Empire.Universe.Paused && (PosUpdateTimer <= 0.0f || ParentSystem.isVisible))
+            if (!Empire.Universe.Paused && (PosUpdateTimer <= 0.0f || ParentSystem.IsVisible))
             {
                 PosUpdateTimer = 5f;
                 OrbitalAngle += (float) Math.Asin(15.0 / OrbitalRadius);
@@ -328,7 +328,7 @@ namespace Ship_Game
                 Center = ParentSystem.Position.PointFromAngle(OrbitalAngle, OrbitalRadius);
             }
 
-            if (ParentSystem.isVisible)
+            if (ParentSystem.IsVisible)
             {
                 Zrotate += ZrotateAmount * timeStep.FixedTime;
                 SO.World = Matrix.CreateScale(3f)
@@ -350,10 +350,13 @@ namespace Ship_Game
                 SO.Visibility = ObjectVisibility.None;
         }
 
-        protected void CreatePlanetSceneObject(GameScreen screen)
+        protected void CreatePlanetSceneObject()
         {
             if (SO != null)
-                screen?.RemoveObject(SO);
+            {
+                Log.Info($"RemoveSolarSystemBody: {Name}");
+                ScreenManager.Instance?.RemoveObject(SO);
+            }
             SO = StaticMesh.GetPlanetarySceneMesh(ResourceManager.RootContent, Type.MeshPath);
             SO.World = Matrix.CreateScale(Scale * 3)
                      * Matrix.CreateTranslation(new Vector3(Center, 2500f));
@@ -362,7 +365,7 @@ namespace Ship_Game
                       * Matrix.CreateScale(5f)
                       * Matrix.CreateTranslation(new Vector3(Center, 2500f));
 
-            screen?.AddObject(SO);
+            ScreenManager.Instance?.AddObject(SO);
         }
 
         protected void UpdateDescription()
@@ -505,6 +508,7 @@ namespace Ship_Game
                 newOwner.data.Traits.PopGrowthMin         = GetTraitMax(newOwner.data.Traits.PopGrowthMin, ownerTraits.PopGrowthMin);
                 newOwner.data.Traits.SpyModifier          = GetTraitMax(newOwner.data.Traits.SpyModifier, ownerTraits.SpyModifier);
                 newOwner.data.Traits.Spiritual            = GetTraitMax(newOwner.data.Traits.Spiritual, ownerTraits.Spiritual);
+                newOwner.data.Traits.TerraformingLevel    = (int)GetTraitMax(newOwner.data.Traits.TerraformingLevel, ownerTraits.TerraformingLevel);
 
                 // Do not add AI difficulty modifiers for the below
                 float realProductionMod = ownerTraits.ProductionMod - Owner.DifficultyModifiers.ProductionMod;

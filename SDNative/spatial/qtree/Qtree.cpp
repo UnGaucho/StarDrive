@@ -1,4 +1,5 @@
 #include "Qtree.h"
+#include "../Search.h"
 #include <algorithm>
 #include <unordered_set>
 
@@ -42,7 +43,7 @@ namespace spatial
 
         Levels = 0;
         int currentSize = FullSize;
-        while (currentSize > SmallestCell*2)
+        while (currentSize >= SmallestCell)
         {
             currentSize /= 2;
             ++Levels;
@@ -57,7 +58,7 @@ namespace spatial
         Dbg.clear();
     }
 
-    void Qtree::rebuild()
+    SpatialRoot* Qtree::rebuild()
     {
         // swap the front and back-buffer
         // the front buffer will be reset and reused
@@ -78,6 +79,7 @@ namespace spatial
             }
         }
         Root = root;
+        return reinterpret_cast<SpatialRoot*>(root);
     }
 
     struct OverlapsRect
@@ -196,11 +198,12 @@ namespace spatial
         SPATIAL_FINLINE T pop_back() { return items[next--]; }
     };
 
-    CollisionPairs Qtree::collideAll(const CollisionParams& params)
+    CollisionPairs Qtree::collideAll(SpatialRoot* root, const CollisionParams& params)
     {
+        QtreeNode* rootNode = reinterpret_cast<QtreeNode*>(root);
         Collider collider { *FrontAlloc, Objects.maxObjects() };
 
-        SmallStack<QtreeNode*> stack { Root };
+        SmallStack<QtreeNode*> stack { rootNode };
         do
         {
             const QtreeNode& current = *stack.pop_back();
@@ -230,10 +233,11 @@ namespace spatial
     }
 
     #pragma warning( disable : 6262 )
-    int Qtree::findNearby(int* outResults, const SearchOptions& opt) const
+    int Qtree::findNearby(SpatialRoot* root, int* outResults, const SearchOptions& opt) const
     {
-        FoundNodes found;
-        SmallStack<const QtreeNode*> stack { Root };
+        QtreeNode* rootNode = reinterpret_cast<QtreeNode*>(root);
+        FoundCells found;
+        SmallStack<const QtreeNode*> stack { rootNode };
         Rect searchRect = opt.SearchRect;
         uint32_t loyaltyMask = getLoyaltyMask(opt);
         do
@@ -260,7 +264,9 @@ namespace spatial
 
         int numResults = 0;
         if (found.count)
-            numResults = spatial::findNearby(outResults, Objects.maxObjects(), opt, found);
+        {
+            numResults = found.filterResults(outResults, Objects, opt);
+        }
 
         if (opt.DebugId)
         {
@@ -274,13 +280,14 @@ namespace spatial
         return numResults;
     }
 
-    void Qtree::debugVisualize(const VisualizerOptions& opt, Visualizer& visualizer) const
+    void Qtree::debugVisualize(SpatialRoot* root, const VisualizerOptions& opt, Visualizer& visualizer) const
     {
+        QtreeNode* rootNode = reinterpret_cast<QtreeNode*>(root);
         char text[128];
         Rect visibleRect = opt.visibleWorldRect;
-        visualizer.drawRect(Root->rect(), Yellow);
+        visualizer.drawRect(rootNode->rect(), Yellow);
 
-        SmallStack<const QtreeNode*> stack { Root };
+        SmallStack<const QtreeNode*> stack { rootNode };
         do
         {
             const QtreeNode& current = *stack.pop_back();

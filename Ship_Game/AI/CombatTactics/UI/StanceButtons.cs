@@ -19,20 +19,19 @@ namespace Ship_Game.AI.CombatTactics.UI
     public abstract class StanceButtons : UIElementContainer
     {
         readonly Array<OrdersToggleButton> OrdersButtons = new Array<OrdersToggleButton>();
-        Vector2 OrdersBarPos;
         public readonly GameScreen Screen;
-        public bool IsHovered { get; private set; }
+        Vector2 OrdersBarPos;
 
         protected StanceButtons(GameScreen parent, Vector2 topLeft) : base(parent.Rect)
         {
-            OrdersBarPos = topLeft;
             Visible = false;
             Screen = parent;
+            LoadContent(topLeft);
         }
 
-        public void LoadContent()
+        void LoadContent(Vector2 topLeft)
         {
-
+            OrdersBarPos = topLeft;
             AddOrderBtn("SelectionBox/icon_formation_headon", CombatState.AttackRuns, toolTip: GameText.ShipWillMakeHeadonAttack);
             AddOrderBtn("SelectionBox/icon_grid", CombatState.ShortRange, toolTip: GameText.ShipWillRotateSoThat2);
             AddOrderBtn("SelectionBox/icon_formation_aft", CombatState.Artillery, toolTip: GameText.ShipWillRotateSoThat);
@@ -44,7 +43,7 @@ namespace Ship_Game.AI.CombatTactics.UI
             OrdersBarPos = new Vector2(OrdersBarPos.X - 3 * 25f, OrdersBarPos.Y + 25f);
             AddOrderBtn("SelectionBox/icon_formation_bleft", CombatState.BroadsideLeft, toolTip: GameText.ShipWillMoveWithinMaximum);
             AddOrderBtn("SelectionBox/icon_formation_bright", CombatState.BroadsideRight, toolTip: GameText.ShipWillMoveWithinMaximum2);
-
+            AddOrderBtn("UI/icon_shield", CombatState.GuardMode, toolTip: GameText.TT_GuardMode);
         }
 
         void AddOrderBtn(string icon, CombatState state, LocalizedText toolTip)

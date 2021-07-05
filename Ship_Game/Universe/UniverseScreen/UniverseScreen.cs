@@ -1,6 +1,5 @@
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Particle3DSample;
 using Ship_Game.AI;
 using Ship_Game.Debug;
 using Ship_Game.Empires;
@@ -18,6 +17,7 @@ using Ship_Game.GameScreens;
 using Ship_Game.GameScreens.DiplomacyScreen;
 using Ship_Game.Universe;
 using Ship_Game.Fleets;
+using Ship_Game.Graphics.Particles;
 
 namespace Ship_Game
 {
@@ -81,23 +81,9 @@ namespace Ship_Game
         PieMenu pieMenu;
         PieMenuNode planetMenu;
         PieMenuNode shipMenu;
-        public ParticleSystem beamflashes;
-        public ParticleSystem explosionParticles;
-        public ParticleSystem photonExplosionParticles;
-        public ParticleSystem explosionSmokeParticles;
-        public ParticleSystem projectileTrailParticles;
-        public ParticleSystem fireTrailParticles;
-        public ParticleSystem smokePlumeParticles;
-        public ParticleSystem fireParticles;
-        public ParticleSystem engineTrailParticles;
-        public ParticleSystem flameParticles;
-        public ParticleSystem SmallflameParticles;
-        public ParticleSystem sparks;
-        public ParticleSystem lightning;
-        public ParticleSystem flash;
-        public ParticleSystem star_particles;
-        public ParticleSystem neb_particles;
-        public StarField StarField;
+
+        public ParticleManager Particles;
+
         public Background3D bg3d;
         public bool GravityWells;
         public Empire PlayerEmpire;
@@ -134,7 +120,6 @@ namespace Ship_Game
         public Empire player;
         MiniMap minimap;
         bool loading;
-        public Thread ProcessTurnsThread;
         public float transitionElapsedTime;
 
         // @note Initialize with a default frustum for UnitTests
@@ -373,7 +358,7 @@ namespace Ship_Game
 
         void InitializeCamera()
         {
-             float univSizeOnScreen = 10f;
+            float univSizeOnScreen = 10f;
             MaxCamHeight = 15000000;
             CreateProjectionMatrix();
 
@@ -413,7 +398,12 @@ namespace Ship_Game
             InitializeSolarSystems();
             CreatePlanetsLookupTable();
             CreateStationTethers();
-            EmpireManager.RestoreUnserializableDataFromSave();
+
+            foreach (Empire empire in EmpireManager.Empires)
+                empire.InitEmpireFromSave();
+
+            WarmUpShipsForLoad();
+
             RecomputeFleetButtons(true);
 
             if (StarDate.AlmostEqual(1000)) // Run once to get all empire goals going
@@ -421,15 +411,17 @@ namespace Ship_Game
                 UpdateEmpires(FixedSimTime.Zero);
                 EndOfTurnUpdate(FixedSimTime.Zero);
             }
-            CreateProcessTurnsThread();
+            CreateUniverseSimThread();
         }
 
-        void CreateProcessTurnsThread()
+        void CreateUniverseSimThread()
         {
-            ProcessTurnsThread = new Thread(ProcessTurnsMonitored);
-            ProcessTurnsThread.Name = "Universe.ProcessTurns";
-            ProcessTurnsThread.IsBackground = false; // RedFox - make sure ProcessTurns runs with top priority
-            ProcessTurnsThread.Start();
+            if (!CreateSimThread)
+                return;
+            SimThread = new Thread(UniverseSimMonitored);
+            SimThread.Name = "Universe.SimThread";
+            SimThread.IsBackground = false; // RedFox - make sure ProcessTurns runs with top priority
+            SimThread.Start();
         }
 
         void CreatePlanetsLookupTable()
@@ -469,13 +461,14 @@ namespace Ship_Game
                 foreach (Anomaly anomaly in solarSystem.AnomaliesList)
                 {
                     if (anomaly.type == "DP")
-                        anomalyManager.AnomaliesList.Add(
-                            new DimensionalPrison(solarSystem.Position + anomaly.Position));
+                    {
+                        anomalyManager.AnomaliesList.Add(new DimensionalPrison(solarSystem.Position + anomaly.Position));
+                    }
                 }
 
                 foreach (Empire empire in EmpireManager.ActiveEmpires)
                 {
-                        solarSystem.UpdateFullyExploredBy(empire);
+                    solarSystem.UpdateFullyExploredBy(empire);
                 }
             }
         }
@@ -501,26 +494,6 @@ namespace Ship_Game
             }
         }
 
-        void LoadParticles(Data.GameContentManager content, GraphicsDevice device)
-        {
-            beamflashes              = new ParticleSystem(content, "3DParticles/BeamFlash", device);
-            explosionParticles       = new ParticleSystem(content, "3DParticles/ExplosionSettings", device);
-            photonExplosionParticles = new ParticleSystem(content, "3DParticles/PhotonExplosionSettings", device);
-            explosionSmokeParticles  = new ParticleSystem(content, "3DParticles/ExplosionSmokeSettings", device);
-            projectileTrailParticles = new ParticleSystem(content, "3DParticles/ProjectileTrailSettings", device, 1f);
-            fireTrailParticles       = new ParticleSystem(content, "3DParticles/FireTrailSettings", device,1);
-            smokePlumeParticles      = new ParticleSystem(content, "3DParticles/SmokePlumeSettings", device , 1);
-            fireParticles            = new ParticleSystem(content, "3DParticles/FireSettings", device, 1);
-            engineTrailParticles     = new ParticleSystem(content, "3DParticles/EngineTrailSettings", device);
-            flameParticles           = new ParticleSystem(content, "3DParticles/FlameSettings", device);
-            SmallflameParticles      = new ParticleSystem(content, "3DParticles/FlameSettings", device, .25f, (int)(4000 * GlobalStats.DamageIntensity));
-            sparks                   = new ParticleSystem(content, "3DParticles/sparks", device, 1);
-            lightning                = new ParticleSystem(content, "3DParticles/lightning", device, 1);
-            flash                    = new ParticleSystem(content, "3DParticles/FlashSettings", device);
-            star_particles           = new ParticleSystem(content, "3DParticles/star_particles", device);
-            neb_particles            = new ParticleSystem(content, "3DParticles/GalaxyParticle", device);
-        }
-
         void CreateStarParticles()
         {
             int numStars = (int)(UniverseSize / 5000.0f);
@@ -530,7 +503,7 @@ namespace Ship_Game
                     RandomMath.RandomBetween(-0.5f * UniverseSize, UniverseSize + 0.5f * UniverseSize),
                     RandomMath.RandomBetween(-0.5f * UniverseSize, UniverseSize + 0.5f * UniverseSize),
                     RandomMath.RandomBetween(-200000f, -2E+07f));
-                star_particles.AddParticleThreadA(position, Vector3.Zero);
+                Particles.StarParticles.AddParticleThreadA(position, Vector3.Zero);
             }
         }
 
@@ -543,11 +516,14 @@ namespace Ship_Game
             int width   = GameBase.ScreenWidth;
             int height  = GameBase.ScreenHeight;
 
-            LoadParticles(content, device);
+            Particles = new ParticleManager(content, device);
 
-            bg = new Background();
-            bg3d = new Background3D(this);
-            StarField = new StarField(this);
+            if (GlobalStats.DrawStarfield)
+            {
+                bg = new Background(this);
+            }
+            if (GlobalStats.DrawNebulas)
+                bg3d = new Background3D(this);
             
             CreateStarParticles();
 
@@ -607,7 +583,6 @@ namespace Ship_Game
             FTLManager.LoadContent(this);
             MuzzleFlashManager.LoadContent(content);
             ScreenRectangle = new Rectangle(0, 0, width, height);
-            StarField = new StarField(this);
 
             ShipsInCombat = ButtonMediumMenu(width - 275, height - 280, "Ships: 0");
             ShipsInCombat.DynamicText = () =>
@@ -762,12 +737,6 @@ namespace Ship_Game
             }
         }
 
-        void AutoSaveCurrentGame()
-        {
-            var savedGame = new SavedGame(this, "Autosave" + Auto);
-            if (++Auto > 3) Auto = 1;
-        }
-
         void ProjectPieMenu(Vector2 position, float z)
         {
             Vector3 proj = Viewport.Project(position.ToVec3(z), Projection, View, Matrix.Identity);
@@ -778,32 +747,19 @@ namespace Ship_Game
 
         void UnloadGraphics()
         {
+            if (bloomComponent == null) // TODO: IsDisposed
+                return;
+
             Log.Write(ConsoleColor.Cyan, "Universe.UnloadGraphics");
             bloomComponent?.Dispose(ref bloomComponent);
-            bg3d          ?.Dispose(ref bg3d);
-            StarField     ?.Dispose(ref StarField);
+            bg?.Dispose(ref bg);
+            bg3d?.Dispose(ref bg3d);
             FogMap      ?.Dispose(ref FogMap);
             FogMapTarget?.Dispose(ref FogMapTarget);
             BorderRT    ?.Dispose(ref BorderRT);
             MainTarget  ?.Dispose(ref MainTarget);
             LightsTarget?.Dispose(ref LightsTarget);
-
-            beamflashes             ?.Dispose(ref beamflashes);
-            explosionParticles      ?.Dispose(ref explosionParticles);
-            photonExplosionParticles?.Dispose(ref photonExplosionParticles);
-            explosionSmokeParticles ?.Dispose(ref explosionSmokeParticles);
-            projectileTrailParticles?.Dispose(ref projectileTrailParticles);
-            fireTrailParticles      ?.Dispose(ref fireTrailParticles);
-            smokePlumeParticles     ?.Dispose(ref smokePlumeParticles);
-            fireParticles           ?.Dispose(ref fireParticles);
-            engineTrailParticles    ?.Dispose(ref engineTrailParticles);
-            flameParticles          ?.Dispose(ref flameParticles);
-            SmallflameParticles     ?.Dispose(ref SmallflameParticles);
-            sparks                  ?.Dispose(ref sparks);
-            lightning               ?.Dispose(ref lightning);
-            flash                   ?.Dispose(ref flash);
-            star_particles          ?.Dispose(ref star_particles);
-            neb_particles           ?.Dispose(ref neb_particles);
+            Particles?.Dispose(ref Particles);
         }
 
         protected override void Destroy()
@@ -823,8 +779,8 @@ namespace Ship_Game
         {
             IsExiting = true;
 
-            Thread processTurnsThread = ProcessTurnsThread;
-            ProcessTurnsThread = null;
+            Thread processTurnsThread = SimThread;
+            SimThread = null;
             DrawCompletedEvt.Set(); // notify processTurnsThread that we're terminating
             processTurnsThread?.Join(250);
 

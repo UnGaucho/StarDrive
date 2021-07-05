@@ -28,8 +28,12 @@
         public readonly int TrustLostStoleColony; // Vs players
         public readonly float FleetStrModifier; // AI increase/decrease str of fleets needs, when they win or lose vs another empire
         public readonly int NumSystemsToSniff; // Number of system the AI will try to re-scout until it is fully explored
-        public readonly float TechValueModifier; // AI tech value vs players
         public readonly int PlayerWarPriorityLimit; // Priority of wars vs player (war priority is 0 to 10 where 0 means more priority)
+        public readonly int NumWarTasksPerWar;
+        public readonly int WarTaskPriorityMod; // higher priority vs player if at war with them
+
+        // A mod can set the general str of remnant designs. Default is 2 an this is a multiplier for starting fleet multiplier
+        public readonly float RemnantStrModifier; 
 
         // AI Buffs/Nerfs
         public readonly float FlatMoneyBonus;
@@ -47,6 +51,10 @@
 
         public DifficultyModifiers(Empire empire, UniverseData.GameDifficulty difficulty)
         {
+            float remnantGeneralStr = 2; // Vanilla will be 2
+            if (GlobalStats.ActiveModInfo != null && GlobalStats.ActiveModInfo.RemnantDesignStrMultiplier > 0.01f)
+                remnantGeneralStr = GlobalStats.ActiveModInfo.RemnantDesignStrMultiplier;
+
             DataVisibleToPlayer    = false;
             FlatMoneyBonus         = 0;
             ProductionMod          = 0;
@@ -55,7 +63,6 @@
             ShipCostMod            = 0;
             ResearchTaxMultiplier  = 0;
             ModHpModifier          = 0;
-            TechValueModifier      = 1;
             PlayerWarPriorityLimit = 10;
             switch (difficulty)
             {
@@ -84,6 +91,9 @@
                     TrustLostStoleColony = 0;
                     FleetStrModifier     = 0.2f;
                     NumSystemsToSniff    = 1;
+                    NumWarTasksPerWar    = 1;
+                    WarTaskPriorityMod   = 0;
+                    RemnantStrModifier   = remnantGeneralStr;
                     if (!empire.isPlayer)
                     {
                         ProductionMod = -0.1f;
@@ -118,7 +128,9 @@
                     TrustLostStoleColony = 5;
                     FleetStrModifier     = 0.3f;
                     NumSystemsToSniff    = 2;
-
+                    NumWarTasksPerWar    = 2;
+                    WarTaskPriorityMod   = 0;
+                    RemnantStrModifier   = remnantGeneralStr + 0.5f; 
                     if (!empire.isPlayer)
                     {
                         FlatMoneyBonus         = 5;
@@ -150,7 +162,9 @@
                     TrustLostStoleColony = 10;
                     FleetStrModifier     = 0.5f;
                     NumSystemsToSniff    = 3;
-
+                    NumWarTasksPerWar    = 3;
+                    WarTaskPriorityMod   = 1;
+                    RemnantStrModifier = remnantGeneralStr + 1;
                     if (!empire.isPlayer)
                     {
                         FlatMoneyBonus         = 10;
@@ -159,7 +173,6 @@
                         TaxMod                 = 0.5f;
                         ShipCostMod            = -0.2f;
                         ResearchTaxMultiplier  = 0.7f;
-                        TechValueModifier      = 1.1f;
                         PlayerWarPriorityLimit = 5;
                     }
 
@@ -188,7 +201,9 @@
                     TrustLostStoleColony = 15;
                     FleetStrModifier     = 0.65f;
                     NumSystemsToSniff    = 4;
-
+                    NumWarTasksPerWar    = 4;
+                    WarTaskPriorityMod   = 2;
+                    RemnantStrModifier   = remnantGeneralStr + 1.5f;
                     if (!empire.isPlayer)
                     {
                         FlatMoneyBonus         = 20;
@@ -197,7 +212,6 @@
                         TaxMod                 = 1f;
                         ShipCostMod            = -0.5f;
                         ResearchTaxMultiplier  = 0.3f;
-                        TechValueModifier      = 1.2f;
                         PlayerWarPriorityLimit = 2;
                     }
 

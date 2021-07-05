@@ -76,6 +76,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AITests\Empire\TestEmpireAI.cs" />
+    <Compile Include="AITests\Ships\ShipAICombatTests.cs" />
     <Compile Include="AITests\Ships\TestShipMove.cs" />
     <Compile Include="AssertExtensions.cs" />
     <Compile Include="Collections\ArrayTypesTestBase.cs" />
@@ -95,8 +96,12 @@
     <Compile Include="Planets\LandOnTiles.cs" />
     <Compile Include="Planets\TestOrbitalBomb.cs" />
     <Compile Include="Serialization\StringViewTests.cs" />
+    <Compile Include="Serialization\YamlSerializerTests.cs" />
+    <Compile Include="Ships\CarrierTests.cs" />
     <Compile Include="Ships\ModuleGridTests.cs" />
     <Compile Include="Ships\ShipDataTests.cs" />
+    <Compile Include="Ships\ShipHullTests.cs" />
+    <Compile Include="Ships\ShipLoyaltyTests.cs" />
     <Compile Include="Ships\ShipModuleGridTests.cs" />
     <Compile Include="Ships\ShipModuleTests.cs" />
     <Compile Include="Ships\TestHealth.cs" />
@@ -117,6 +122,7 @@
     <Compile Include="LinearAlgebra\TestMathExt.cs" />
     <Compile Include="Collections\TestSafeQueueT.cs" />
     <Compile Include="Serialization\TestSerialization.cs" />
+    <Compile Include="Universe\SaveLoadUniverseScreenTests.cs" />
     <Compile Include="Universe\SpatialVisualization.cs" />
     <Compile Include="Universe\TestManagedQuadTree.cs" />
     <Compile Include="TestThreadExt.cs" />
@@ -126,7 +132,7 @@
     <Compile Include="TestProgressCounter.cs" />
     <Compile Include="LinearAlgebra\TestVectorMath.cs" />
     <Compile Include="TestImpactPredictor.cs" />
-    <Compile Include="Serialization\TestYamlSerializer.cs" />
+    <Compile Include="Serialization\YamlDeserializerTests.cs" />
     <Compile Include="Serialization\TestBinarySerializer.cs" />
     <Compile Include="UI\MockGameScreen.cs" />
     <Compile Include="UI\MockInputProvider.cs" />
@@ -136,6 +142,7 @@
     <Compile Include="Universe\TestNativeSpatial.cs" />
     <Compile Include="Universe\TestSpatialCommon.cs" />
     <Compile Include="Collections\DoubleBufferedArrayTests.cs" />
+    <Compile Include="Utils\PerfTimerTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -178,10 +185,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Ship_Game\AI\ShipAI\" />
-    <Folder Include="Utils\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
@@ -198,8 +202,6 @@
   <Import Project="..\packages\MSTest.TestAdapter.2.1.2\build\net45\MSTest.TestAdapter.targets" Condition="Exists('..\packages\MSTest.TestAdapter.2.1.2\build\net45\MSTest.TestAdapter.targets')" />
   <PropertyGroup>
     <PostBuildEvent>
-:: Copy Game content from BB/Content into UnitTests/bin/Release/Content 
-:: powershell -ExecutionPolicy Bypass -File $(SolutionDir)CopyGameContent.ps1 $(SolutionDir) $(TargetDir) NOMOD
-</PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
 </Project>

@@ -280,13 +280,14 @@ namespace Ship_Game
             empire.PortraitName        = data.PortraitName;
             empire.EmpireColor         = new Color(128, 128, 128, 255);
 
-            empire.InitializeFromSave();
-            empire.UpdatePopulation();
             data.IsRebelFaction  = true;
             data.Traits.Name     = data.RebelName;
             data.Traits.Singular = data.RebelSing;
             data.Traits.Plural   = data.RebelPlur;
             empire.isFaction     = true;
+
+            empire.InitializeFromSave();
+            empire.UpdatePopulation();
 
             Add(empire);
 
@@ -315,29 +316,6 @@ namespace Ship_Game
                 }
             }
             return null;
-        }
-
-        public static void RestoreUnserializableDataFromSave()
-        {
-            if (Empires.IsEmpty)
-                Log.Error("must be called after empireList is populated.");
-
-            foreach (Empire empire in Empires)
-            {
-                empire.EmpireShips.UpdatePublicLists();
-                empire.Research.UpdateNetResearch();
-            }
-
-            Empire.Universe.WarmUpShipsForLoad();
-
-            foreach (Empire empire in Empires)
-            { 
-                empire.GetEmpireAI().EmpireDefense = empire.GetEmpireAI().EmpireDefense ?? War.CreateInstance(empire, empire, WarType.EmpireDefense);
-                empire.RestoreUnserializableDataFromSave();
-                empire.InitEmpireEconomy();
-                empire.AIManagedShips.Update();
-                empire.GetEmpireAI().WarTasks.RestoreFromSave(empire);
-            }
         }
     }
 }

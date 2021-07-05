@@ -22,6 +22,8 @@ namespace Ship_Game
         public readonly float AllyCallToWarRatio; // The tolerance the AI has to join war with an ally vs 3rd party
         public readonly int PostInvasionTurns; // How many turns a post invasion defense fleet will stay
         public readonly float GoToWarTolerance; // How stronger then them should we be in order to go to war when preparing
+        public readonly float DoomFleetThreshold; // If over this threshold, the AI will send a fleet to glass the target planet
+        public readonly float WarTasksLifeTime; // How many turns to keep trying fleet requisition before timeout, 1f is 10 turns
 
         public PersonalityModifiers(PersonalityType type)
         {
@@ -39,12 +41,14 @@ namespace Ship_Game
                     DefenseTaskWeight     = 2;
                     FleetStrMultiplier    = 1;
                     FederationPopRatioWar = 1.5f;
+                    DoomFleetThreshold    = 2;
                     AssaultBomberRatio    = 0.5f;
                     AllyCallToWarRatio    = 1.2f;
                     TrustCostTradePact    = 0;
                     TechValueModifier     = 1;
                     PostInvasionTurns     = 50;
                     GoToWarTolerance      = 1.5f;
+                    WarTasksLifeTime      = 1;
                     TrustCostNaPact       = 0;
                     break;
                 case PersonalityType.Aggressive:
@@ -59,12 +63,14 @@ namespace Ship_Game
                     DefenseTaskWeight     = 4f;
                     FleetStrMultiplier    = 1.4f;
                     FederationPopRatioWar = 1.25f;
+                    DoomFleetThreshold    = 1.5f;
                     AssaultBomberRatio    = 0.75f;
                     AllyCallToWarRatio    = 1.15f;
                     TrustCostTradePact    = 20;
                     TrustCostNaPact       = 35;
                     PostInvasionTurns     = 25;
                     TechValueModifier     = 1.05f;
+                    WarTasksLifeTime      = 3;
                     GoToWarTolerance      = 1.1f;
                     break;
                 case PersonalityType.Ruthless:
@@ -79,12 +85,14 @@ namespace Ship_Game
                     DefenseTaskWeight     = 6;
                     FleetStrMultiplier    = 1.3f;
                     FederationPopRatioWar = 1.2f;
+                    DoomFleetThreshold    = 1f;
                     AssaultBomberRatio    = 1;
                     AllyCallToWarRatio    = 1.2f;
                     TrustCostTradePact    = 15;
                     TrustCostNaPact       = 45f;
                     PostInvasionTurns     = 25;
                     TechValueModifier     = 1.1f;
+                    WarTasksLifeTime      = 2.5f;
                     GoToWarTolerance      = 1.15f;
                     break;
                 case PersonalityType.Xenophobic:
@@ -99,12 +107,14 @@ namespace Ship_Game
                     DefenseTaskWeight     = 7;
                     FleetStrMultiplier    = 1.05f;
                     FederationPopRatioWar = 1.45f;
+                    DoomFleetThreshold    = 1.75f;
                     AllyCallToWarRatio    = 1.1f;
                     AssaultBomberRatio    = 0.5f;
                     TrustCostTradePact    = 15;
                     TrustCostNaPact       = 15;
                     PostInvasionTurns     = 50;
                     TechValueModifier     = 1.2f;
+                    WarTasksLifeTime      = 2.5f;
                     GoToWarTolerance      = 1.5f;
                     break;
                 case PersonalityType.Cunning:
@@ -119,12 +129,14 @@ namespace Ship_Game
                     DefenseTaskWeight     = 8;
                     FleetStrMultiplier    = 0.95f;
                     FederationPopRatioWar = 1.2f;
+                    DoomFleetThreshold    = 2;
                     AssaultBomberRatio    = 0.8f;
                     AllyCallToWarRatio    = 1.25f;
                     TrustCostTradePact    = 5;
                     TrustCostNaPact       = 5;
                     PostInvasionTurns     = 60;
                     TechValueModifier     = 1.1f;
+                    WarTasksLifeTime      = 2;
                     GoToWarTolerance      = 1.5f;
                     break;
                 case PersonalityType.Honorable:
@@ -139,12 +151,14 @@ namespace Ship_Game
                     DefenseTaskWeight     = 9;
                     FleetStrMultiplier    = 1f;
                     FederationPopRatioWar = 1.25f;
+                    DoomFleetThreshold    = 2.5f;
                     AssaultBomberRatio    = 0.6f;
                     AllyCallToWarRatio    = 1f;
                     TrustCostTradePact    = 10;
                     TrustCostNaPact       = 10;
                     PostInvasionTurns     = 70;
                     TechValueModifier     = 1;
+                    WarTasksLifeTime      = 3;
                     GoToWarTolerance      = 1.1f;
                     break;
                 case PersonalityType.Pacifist:
@@ -159,12 +173,14 @@ namespace Ship_Game
                     DefenseTaskWeight     = 10;
                     FleetStrMultiplier    = 0.9f;
                     FederationPopRatioWar = 1.1f;
+                    DoomFleetThreshold    = 3;
                     AssaultBomberRatio    = 0.5f;
                     AllyCallToWarRatio    = 1.35f;
                     TrustCostTradePact    = 12;
                     TrustCostNaPact       = 3;
                     PostInvasionTurns     = 75;
                     TechValueModifier     = 1;
+                    WarTasksLifeTime      = 1.5f;
                     GoToWarTolerance      = 2f;
                     break;
             }

@@ -22,7 +22,7 @@
 	<HealthMax>7680</HealthMax>
 	<RepairDifficulty>1</RepairDifficulty>		      			
 	<!-- Power Drawn -->
-	<PowerDraw>0</PowerDraw>
+	<PowerDraw>1</PowerDraw>
 	<!-- Armor resistance -->
 	<!-- for PowerPlant Items -->
     <explodes>false</explodes>
@@ -33,4 +33,8 @@
 	<!-- for Weapons -->
 	<!-- Description -->
 	<Description>Advanced Armored Solar collector, procides power within a small radius.</Description>
+
+  <PowerFlowMax>0</PowerFlowMax>
+  <PowerStoreMax>0</PowerStoreMax>
+  <PowerRadius>4</PowerRadius>
 </ShipModule>

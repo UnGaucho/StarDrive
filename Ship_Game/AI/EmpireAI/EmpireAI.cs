@@ -5,6 +5,7 @@ using Ship_Game.Ships;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Ship_Game.AI.Compnonents;
 using Ship_Game.Commands.Goals;
 using Ship_Game.Debug;
 using Ship_Game.GameScreens.DiplomacyScreen;
@@ -27,10 +28,10 @@ namespace Ship_Game.AI
 
         public string EmpireName;
         public DefensiveCoordinator DefensiveCoordinator;
-        public BatchRemovalCollection<Goal> Goals            = new BatchRemovalCollection<Goal>();
+        public BatchRemovalCollection<Goal> Goals = new BatchRemovalCollection<Goal>();
         public ThreatMatrix ThreatMatrix;                     
-        public Array<AO> AreasOfOperations                   = new Array<AO>();
-        public Array<int> UsedFleets                         = new Array<int>();
+        public Array<AO> AreasOfOperations = new Array<AO>();
+        public Array<int> UsedFleets = new Array<int>();
         public float DefStr;
         public ExpansionAI.ExpansionPlanner ExpansionAI;
 
@@ -39,11 +40,11 @@ namespace Ship_Game.AI
             EmpireName                = e.data.Traits.Name;
             OwnerEmpire               = e;
             ThreatMatrix              = new ThreatMatrix(e);
-            DefensiveCoordinator      = new DefensiveCoordinator(e);
+            DefensiveCoordinator      = new DefensiveCoordinator(e, "DefensiveCoordinator");
             OffensiveForcePoolManager = new OffensiveForcePoolManager(e);
             TechChooser               = new Research.ChooseTech(e);
             ExpansionAI               = new ExpansionAI.ExpansionPlanner(OwnerEmpire);
-
+            BudgetSettings            = new BudgetPriorities(e);
             if (OwnerEmpire.data.EconomicPersonality != null)
                 NumberOfShipGoals += OwnerEmpire.data.EconomicPersonality.ShipGoalsPlus;
 
@@ -143,18 +144,13 @@ namespace Ship_Game.AI
             var aos = AreasOfOperations;
             if (aos.Count == 0)
             {
-                return new AO(OwnerEmpire);
+                var ao = new AO(OwnerEmpire);
+                AreasOfOperations.Add(ao);
+                return ao;
             }
 
             AO closestAO = aos.FindMin(ao => ao.Center.SqDist(position));
             return closestAO;
-        }
-
-        public float DistanceToClosestAO(Vector2 position)
-        {
-            AO ao = FindClosestAOTo(position);
-            if (ao == null) return OwnerEmpire.WeightedCenter.Distance(position);
-            return ao.Center.Distance(position);
         }
 
         public AO AoContainingPosition(Vector2 location)
@@ -190,6 +186,7 @@ namespace Ship_Game.AI
             // even if they decided to colonize a planet after another empire did so
             bool warnAnyway       = OwnerEmpire.IsXenophobic && usToThem.Posture != Posture.Friendly;
             float detectionChance = OwnerEmpire.ColonizationDetectionChance(usToThem, them);
+            Relationship themToUs = them.GetRelations(OwnerEmpire);
             foreach (Goal ourGoal in ourColonizationGoals)
             {
                 var system = ourGoal.ColonizationTarget.ParentSystem;
@@ -234,13 +231,16 @@ namespace Ship_Game.AI
                 if (warnExclusive || warnAnyway)
                     return true;
 
+                if (themToUs.WarnedSystemsList.Contains(goal.ColonizationTarget.ParentSystem.guid))
+                    return false; // They warned us, so no need to warn them
+
                 // If they stole planets from us, we will value our targets more.
-                // If we have more planets then them, we will cut them some slack.
-                Planet p           = goal.ColonizationTarget;
-                float planetsRatio = (float)OwnerEmpire.GetPlanets().Count / them.GetPlanets().Count.LowerBound(1);
-                float valueForUs   = p.ColonyPotentialValue(OwnerEmpire) * usToThem.NumberStolenClaims;
-                float valueForThem = p.ColonyPotentialValue(them) * planetsRatio;
-                float ratio        = valueForUs / valueForThem.LowerBound(1);
+                // If we have more pop then them, we will cut them some slack.
+                Planet p          = goal.ColonizationTarget;
+                float popRatio    = OwnerEmpire.MaxPopBillion / them.MaxPopBillion.LowerBound(1);
+                float valueToUs   = p.ColonyPotentialValue(OwnerEmpire) * (usToThem.NumberStolenClaims + 1);
+                float valueToThem = p.ColonyPotentialValue(them) * popRatio;
+                float ratio       = valueToUs / valueToThem.LowerBound(1);
 
                 return ratio > OwnerEmpire.PersonalityModifiers.ColonizationClaimRatioWarningThreshold;
             }
@@ -273,9 +273,9 @@ namespace Ship_Game.AI
             }
         }
 
-        public void AddScrapShipGoal(Ship ship)
+        public void AddScrapShipGoal(Ship ship, bool immediateScuttle)
         {
-            Goals.Add(new ScrapShip(ship, OwnerEmpire));
+            Goals.Add(new ScrapShip(ship, OwnerEmpire, immediateScuttle));
         }
 
         public void AddPlanetaryRearmGoal(Ship ship, Planet p, Ship existingSupplyShip = null)

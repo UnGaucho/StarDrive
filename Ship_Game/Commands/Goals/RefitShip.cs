@@ -6,7 +6,7 @@ using Ship_Game.Ships;
 
 namespace Ship_Game.Commands.Goals  // Created by Fat Bastard
 {
-    class RefitShip : Goal
+    public class RefitShip : Goal
     {
         public const string ID = "RefitShips";
         public override string UID => ID;
@@ -48,7 +48,7 @@ namespace Ship_Game.Commands.Goals  // Created by Fat Bastard
                 RemoveOldRefitGoal();
 
             if (!empire.FindPlanetToRefitAt(empire.SafeSpacePorts, OldShip.RefitCost(newShip), 
-                OldShip, OldShip.fleet != null, out PlanetBuildingAt))
+                OldShip, newShip, OldShip.fleet != null, out PlanetBuildingAt))
             {
                 OldShip.AI.ClearOrders();
                 return GoalStep.GoalFailed;  // No planet to refit

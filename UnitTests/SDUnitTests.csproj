@@ -75,6 +75,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AITests\Empire\ShipsWeCanBuildTests.cs" />
     <Compile Include="AITests\Empire\TestEmpireAI.cs" />
     <Compile Include="AITests\Ships\ShipAICombatTests.cs" />
     <Compile Include="AITests\Ships\TestShipMove.cs" />
@@ -104,7 +105,8 @@
     <Compile Include="Ships\ShipLoyaltyTests.cs" />
     <Compile Include="Ships\ShipModuleGridTests.cs" />
     <Compile Include="Ships\ShipModuleTests.cs" />
-    <Compile Include="Ships\TestHealth.cs" />
+    <Compile Include="AITests\Empire\ShipPoolTests.cs" />
+    <Compile Include="Ships\ShipHealthTests.cs" />
     <Compile Include="Ships\TestShields.cs" />
     <Compile Include="Ships\TestSupplyShuttles.cs" />
     <Compile Include="Ships\TestWeaponArcs.cs" />
@@ -116,6 +118,7 @@
     <Compile Include="StarDriveTest.cs" />
     <Compile Include="Ships\TestWeaponMunition.cs" />
     <Compile Include="Ships\TestWeaponModifiers.cs" />
+    <Compile Include="Technologies\Research.cs" />
     <Compile Include="Technologies\TestTechnologyUnlock.cs" />
     <Compile Include="TestGameComponent.cs" />
     <Compile Include="TestImpactPredictor.Scenario.cs" />
@@ -185,7 +188,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="AITests\Research\" />
+  </ItemGroup>
   <Import Project="$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets" Condition="Exists('$(VSToolsPath)\TeamTest\Microsoft.TestTools.targets')" />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

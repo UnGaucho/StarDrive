@@ -98,8 +98,7 @@ namespace Ship_Game.AI.Tasks
             newFleet.FleetTask = this;
             foreach (Ship ship in ships)
             {
-                ship.AI.ClearOrders();
-                Owner.AIManagedShips.RemoveShipFromFleetAndPools(ship);
+                ship.RemoveFromPoolAndFleet(clearOrders: true);
                 newFleet.AddShip(ship);
             }
 
@@ -238,7 +237,7 @@ namespace Ship_Game.AI.Tasks
             }
 
             if (AO.AlmostZero())
-                throw new Exception();
+                throw new Exception("AO cannot be empty");
 
             if (Owner.AIManagedShips.CurrentUseableFleets < 0) 
                 return;
@@ -429,7 +428,7 @@ namespace Ship_Game.AI.Tasks
 
             MinimumTaskForceStrength = (EnemyStrength + buildingsSpaceOffense).LowerBound(lowerBound);
             float multiplier         = Owner.GetFleetStrEmpireMultiplier(TargetEmpire);
-            MinimumTaskForceStrength = (MinimumTaskForceStrength * multiplier).UpperBound(Owner.OffensiveStrength / 4);
+            MinimumTaskForceStrength = (MinimumTaskForceStrength * multiplier).UpperBound(Owner.OffensiveStrength / 2);
         }
 
         string GetFleetName()
@@ -567,7 +566,7 @@ namespace Ship_Game.AI.Tasks
 
         private int WantedNumberOfFleets()
         {
-            int maxFleets = Owner.AllFleetsReady().CountFleets(out _);
+            int maxFleets = Owner.AIManagedShips.CurrentUseableFleets;
             int wantedNumberOfFleets = FleetCount;
             if (TargetPlanet?.Owner != null)
             {

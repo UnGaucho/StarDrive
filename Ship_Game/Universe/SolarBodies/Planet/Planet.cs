@@ -606,7 +606,7 @@ namespace Ship_Game
                     continue;
 
                 float dist = Center.SqDist(ship.Center);
-                if (dist < closestTroop && (ship.IsTroopShip || ship.IsBomber))
+                if (dist < closestTroop && (ship.IsSingleTroopShip || ship.IsDefaultAssaultShuttle || ship.IsBomber))
                 {
                     closestTroop = dist;
                     troop = ship;
@@ -669,7 +669,6 @@ namespace Ship_Game
                 RemoveBuildingFromPlanet(b);
 
             ProdHere += b.ActualCost / 2f;
-            Owner.GetEmpireAI().MaintSavedByBuildingScrappedThisTurn += b.Maintenance;
         }
 
         public void DestroyBuildingOn(PlanetGridSquare tile)
@@ -740,7 +739,6 @@ namespace Ship_Game
             UpdateDevelopmentLevel();
             Description = DevelopmentStatus;
             GeodeticManager.AffectNearbyShips();
-            CalcAverageImportTurns();
             ApplyTerraforming();
             UpdateColonyValue();
             CalcIncomingGoods();
@@ -756,25 +754,6 @@ namespace Ship_Game
             RepairBuildings(1);
             CallForHelp();
             TotalTroopConsumption = GetTotalTroopConsumption();
-        }
-
-        void CalcAverageImportTurns()
-        {
-            if (Owner.isFaction)
-                return;
-
-            if (Owner.GetPlanets().Count <= 1)
-            {
-                AverageImportTurns = 0;
-                return;
-            }
-
-            // Calc per 2 Years (20 turns)
-            if (AverageImportTurns.Greater(0) && (Empire.Universe.StarDate % 2).Greater(0))
-                return;
-
-            AverageImportTurns = Center.Distance(Owner.WeightedCenter) * 2 / (Owner.AverageFreighterFTLSpeed * GlobalStats.TurnTimer);
-            AverageImportTurns = AverageImportTurns.LowerBound(1);
         }
 
         private void NotifyEmptyQueue()
@@ -1051,8 +1030,7 @@ namespace Ship_Game
             ShieldStrengthMax *= (1 + Owner.data.ShieldPowerMod);
             // Added by Gretman -- This will keep a planet from still having shields even after the shield building has been scrapped.
             ShieldStrengthCurrent = ShieldStrengthCurrent.Clamped(0,ShieldStrengthMax);
-            HasSpacePort          = spacePort && (colonyType != ColonyType.Research || Owner.isPlayer); // FB todo - why research Governor is omitted here?
-            //this is a hack to prevent research planets from wasting workers on production.
+            HasSpacePort = spacePort;
 
             // greedy bastards
             Consumption = (ConsumptionPerColonist * PopulationBillion) + TotalTroopConsumption;
@@ -1362,7 +1340,7 @@ namespace Ship_Game
             if (MineralRichness.LessOrEqual(0.1f)) // minimum decay limit
                 return;
 
-            // If the planet outputs 100 production on Brutal, the chance to decay is 5%
+            // If the planet outputs 100 production on Brutal, the chance to decay is 2.5%, normal will be 1%
             float decayChance = Prod.GrossIncome / (Owner.DifficultyModifiers.MineralDecayDivider / GlobalStats.CustomMineralDecay);
 
             // Larger planets have less chance for reduction
@@ -1378,7 +1356,7 @@ namespace Ship_Game
             if (RandomMath.RollDice(decayChance))
             {
                 bool notifyPlayer = MineralRichness.AlmostEqual(1);
-                MineralRichness  -= 0.02f;
+                MineralRichness  -= 0.01f;
                 if (notifyPlayer)
                 {
                     string fullText = $"{Name} {Localizer.Token(GameText.MineralRichnessHasGoneDown)}";

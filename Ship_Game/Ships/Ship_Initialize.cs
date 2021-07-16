@@ -41,7 +41,7 @@ namespace Ship_Game.Ships
 
             // Ships unable to create the moduleslots cant be safely added to empire shiplists. 
             if (!isTemplate && !shipyardDesign)
-                LoyaltyTracker.OnSpawn(this);
+                LoyaltyChangeAtSpawn(empire);
 
             Stats = new ShipStats(this);
             KnownByEmpires = new Components.KnownByEmpire();
@@ -52,14 +52,8 @@ namespace Ship_Game.Ships
         }
 
         // create a NEW ship from template and add it to the universe
-        Ship(Ship template, Empire owner, Vector2 position) : base(GameObjectType.Ship)
+        protected Ship(Ship template, Empire owner, Vector2 position) : base(GameObjectType.Ship)
         {
-            if (!template.shipData.IsValidForCurrentMod)
-            {
-                Log.Info($"Design {template.shipData.Name} [Mod:{template.shipData.ModName}] is not valid for [{GlobalStats.ModOrVanillaName}]");
-                return;
-            }
-
             Position     = position;
             Name         = template.Name;
             BaseStrength = template.BaseStrength;
@@ -71,9 +65,9 @@ namespace Ship_Game.Ships
 
             if (!CreateModuleSlotsFromData(template.shipData.ModuleSlots, fromSave: false))
                 return; // return and crash again...
-            
+
             // ship must not be added to empire ship list until after modules are validated.
-            LoyaltyTracker.OnSpawn(this);
+            LoyaltyChangeAtSpawn(owner);
 
             Stats = new ShipStats(this);
             KnownByEmpires = new Components.KnownByEmpire();
@@ -88,12 +82,7 @@ namespace Ship_Game.Ships
             Empire.Universe?.Objects.Add(this);
         }
 
-        protected Ship(string shipName, Empire owner, Vector2 position)
-                : this(GetShipTemplate(shipName), owner, position)
-        {
-        }
-
-        static Ship GetShipTemplate(string shipName)
+        protected static Ship GetShipTemplate(string shipName)
         {
             if (ResourceManager.GetShipTemplate(shipName, out Ship template))
                 return template;
@@ -284,7 +273,20 @@ namespace Ship_Game.Ships
         // Added by RedFox - Debug, Hangar Ship, and Platform creation
         public static Ship CreateShipAtPoint(string shipName, Empire owner, Vector2 position)
         {
-            var ship = new Ship(shipName, owner, position);
+            Ship template = GetShipTemplate(shipName);
+            if (template == null)
+            {
+                Log.Warning($"CreateShip failed, no such design: {shipName}");
+                return null;
+            }
+            
+            if (!template.shipData.IsValidForCurrentMod)
+            {
+                Log.Info($"Design {template.shipData.Name} [Mod:{template.shipData.ModName}] is not valid for [{GlobalStats.ModOrVanillaName}]");
+                return null;
+            }
+
+            var ship = new Ship(template, owner, position);
             return ship.HasModules ? ship : null;
         }
 
@@ -362,12 +364,10 @@ namespace Ship_Game.Ships
         void InitializeAIFromAISave(SavedGame.ShipAISave aiSave)
         {
             InitializeAI();
-            AI.State              = aiSave.State;
-            AI.DefaultAIState     = aiSave.DefaultState;
-            AI.MovePosition       = aiSave.MovePosition;
-            AI.HasPriorityTarget  = aiSave.PriorityTarget;
-
-            AI.SetPriorityOrder(aiSave.PriorityOrder);
+            AI.State          = aiSave.State;
+            AI.StateBits      = aiSave.StateBits;
+            AI.DefaultAIState = aiSave.DefaultState;
+            AI.MovePosition   = aiSave.MovePosition;
         }
 
         // This should be called when a Ship is ready to enter the universe

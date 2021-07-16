@@ -15,6 +15,7 @@ namespace Ship_Game.Data.Serialization.Types
         {
             ElemType = elemType;
             ElemSerializer = elemSerializer;
+            IsCollection = true;
         }
 
         public override object Convert(object value)
@@ -59,30 +60,40 @@ namespace Ship_Game.Data.Serialization.Types
             return base.Deserialize(node); // try to deserialize value as Array
         }
 
-        public override void Serialize(TextSerializerContext context, object obj)
+        public static void Serialize(IList list, TypeSerializer ser, YamlNode parent)
         {
-            // [StarData] Array<Ship> Ships;
-            // Ships:
-            //   - Ship: ship1
-            //     Position: ...
-            //   - Ship: ship2
-            //     Position: ...
-            var list = (IList)obj;
             int count = list.Count;
-
-            context.Writer.Write(new string(' ', context.Depth));
-            context.Writer.Write("- ");
-
-            context.Depth += 2;
-            context.IgnoreSpacePrefixOnce = true;
-
-            for (int i = 0; i < count; ++i)
+            if (count == 0)
             {
-                object element = list[i];
-                ElemSerializer.Serialize(context, element);
+                parent.Value = Empty<object>.Array; // so we format as "Parent: []"
             }
+            else
+            {
+                bool isPrimitive = !ser.IsUserClass;
+                if (isPrimitive)
+                {
+                    object[] items = new object[count];
+                    parent.Value = items;
+                    for (int i = 0; i < items.Length; ++i)
+                        items[i] = list[i];
+                }
+                else
+                {
+                    for (int i = 0; i < count; ++i)
+                    {
+                        object element = list[i];
+                        var seqElem = new YamlNode();
+                        ser.Serialize(seqElem, element);
+                        parent.AddSequenceElement(seqElem);
+                    }
+                }
+            }
+        }
 
-            context.Depth -= 2;
+        public override void Serialize(YamlNode parent, object obj)
+        {
+            var list = (IList)obj;
+            Serialize(list, ElemSerializer, parent);
         }
 
         public override void Serialize(BinaryWriter writer, object obj)

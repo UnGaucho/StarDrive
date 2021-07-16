@@ -281,6 +281,7 @@ namespace Ship_Game
                         VanityName    = g.VanityName,
                         TetherTarget  = g.TetherTarget,
                         TetherOffset  = g.TetherOffset,
+                        StarDateAdded = g.StarDateAdded
                     };
                     if (g.FinishedShip != null)       gdata.colonyShipGuid            = g.FinishedShip.guid;
                     if (g.ColonizationTarget != null) gdata.markedPlanetGuid          = g.ColonizationTarget.guid;
@@ -435,34 +436,35 @@ namespace Ship_Game
             sdata.AISave.MovePosition = ship.AI.MovePosition;
             sdata.AISave.WayPoints = new Array<WayPoint>(ship.AI.CopyWayPoints());
             sdata.AISave.ShipGoalsList = new Array<ShipGoalSave>();
-            sdata.AISave.PriorityOrder = ship.AI.HasPriorityOrder;
-            sdata.AISave.PriorityTarget = ship.AI.HasPriorityTarget;
+            sdata.AISave.StateBits = ship.AI.StateBits;
 
             foreach (ShipAI.ShipGoal sg in ship.AI.OrderQueue)
             {
                 var s = new ShipGoalSave
                 {
-                    Plan = sg.Plan,
-                    Direction = sg.Direction,
-                    VariableString = sg.VariableString,
-                    SpeedLimit = sg.SpeedLimit,
-                    MovePosition = sg.MovePosition,
-                    fleetGuid = sg.Fleet?.Guid ?? Guid.Empty,
-                    goalGuid = sg.Goal?.guid ?? Guid.Empty,
+                    Plan             = sg.Plan,
+                    Direction        = sg.Direction,
+                    VariableString   = sg.VariableString,
+                    SpeedLimit       = sg.SpeedLimit,
+                    MovePosition     = sg.MovePosition,
+                    fleetGuid        = sg.Fleet?.Guid ?? Guid.Empty,
+                    goalGuid         = sg.Goal?.guid ?? Guid.Empty,
                     TargetPlanetGuid = sg.TargetPlanet?.guid ?? Guid.Empty,
-                    TargetShipGuid = sg.TargetShip?.guid ?? Guid.Empty,
-                    MoveType = sg.MoveType,
-                    VariableNumber = sg.VariableNumber
+                    TargetShipGuid   = sg.TargetShip?.guid ?? Guid.Empty,
+                    MoveType         = sg.MoveType,
+                    VariableNumber   = sg.VariableNumber,
+                    WantedState      = sg.WantedState
                 };
 
                 if (sg.Trade != null)
                 {
                     s.Trade = new TradePlanSave
                     {
-                        Goods = sg.Trade.Goods,
-                        ExportFrom = sg.Trade.ExportFrom?.guid ?? Guid.Empty,
-                        ImportTo = sg.Trade.ImportTo?.guid ?? Guid.Empty,
+                        Goods         = sg.Trade.Goods,
+                        ExportFrom    = sg.Trade.ExportFrom?.guid ?? Guid.Empty,
+                        ImportTo      = sg.Trade.ImportTo?.guid ?? Guid.Empty,
                         BlockadeTimer = sg.Trade.BlockadeTimer,
+                        StardateAdded = sg.Trade.StardateAdded
                     };
                 }
                 sdata.AISave.ShipGoalsList.Add(s);
@@ -604,7 +606,7 @@ namespace Ship_Game
             [Serialize(16)] public string CurrentAutoScout;
             [Serialize(17)] public string CurrentConstructor;
             [Serialize(18)] public float FastVsBigFreighterRatio;
-            [Serialize(19)] public int AverageFreighterCargoCap;
+            [Serialize(19)] public float AverageFreighterCargoCap;
             [Serialize(20)] public int PirateLevel;
             [Serialize(21)] public Map<int, int> PirateThreatLevels;
             [Serialize(22)] public Map<int, int> PiratePaymentTimers;
@@ -771,7 +773,10 @@ namespace Ship_Game
             [Serialize(54)] public int ManualFoodExportSlots;
             [Serialize(55)] public int ManualProdExportSlots;
             [Serialize(56)] public int ManualColoExportSlots;
-
+            [Serialize(57)] public float AverageFoodImportTurns;
+            [Serialize(58)] public float AverageProdImportTurns;
+            [Serialize(59)] public float AverageFoodExportTurns;
+            [Serialize(60)] public float AverageProdExportTurns;
 
             public override string ToString() => $"PlanetSD {Name}";
         }
@@ -840,17 +845,16 @@ namespace Ship_Game
         {
             [Serialize(0)] public AIState State;
             [Serialize(1)] public AIState DefaultState;
-            [Serialize(2)] public Array<ShipGoalSave> ShipGoalsList;
+            [Serialize(2)] public ShipAI.Flags StateBits;
+            [Serialize(3)] public Array<ShipGoalSave> ShipGoalsList;
             // NOTE: Old Vector2 waypoints are no longer compatible
             // Renaming essentially clears all waypoints
-            [Serialize(3)] public Array<WayPoint> WayPoints;
-            [Serialize(4)] public Vector2 MovePosition;
-            [Serialize(5)] public Guid OrbitTarget;
-            [Serialize(6)] public Guid SystemToDefend;
-            [Serialize(7)] public Guid AttackTarget;
-            [Serialize(8)] public Guid EscortTarget;
-            [Serialize(9)] public bool PriorityOrder;
-            [Serialize(10)] public bool PriorityTarget;
+            [Serialize(4)] public Array<WayPoint> WayPoints;
+            [Serialize(5)] public Vector2 MovePosition;
+            [Serialize(6)] public Guid OrbitTarget;
+            [Serialize(7)] public Guid SystemToDefend;
+            [Serialize(8)] public Guid AttackTarget;
+            [Serialize(9)] public Guid EscortTarget;
         }
 
         public class ShipGoalSave
@@ -881,6 +885,7 @@ namespace Ship_Game
             [Serialize(1)] public Guid ImportTo;
             [Serialize(2)] public Goods Goods;
             [Serialize(3)] public float BlockadeTimer;
+            [Serialize(4)] public float StardateAdded;
         }
 
         public class ShipSaveData

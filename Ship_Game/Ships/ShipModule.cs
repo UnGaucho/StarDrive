@@ -39,7 +39,7 @@ namespace Ship_Game.Ships
         bool CanVisualizeDamage;
         public float ShieldPower { get; private set; }
         public short OrdinanceCapacity;
-        bool OnFire;
+        bool OnFire; // is this module on fire?
         Vector3 Center3D;
         public Vector3 GetCenter3D => Center3D;
         const float OnFireThreshold = 0.15f;
@@ -233,7 +233,8 @@ namespace Ship_Game.Ships
         public float ActualShieldPowerMax { get; private set; }
         public float ActualMaxHealth       => TemplateMaxHealth * Bonuses.HealthMod;
 
-        public bool HasInternalRestrictions => Restrictions == Restrictions.I || Restrictions == Restrictions.IO;
+        public bool HasInternalRestrictions => Restrictions == Restrictions.I
+                                            || Restrictions == Restrictions.IO;
 
         // FB: This method was created to deal with modules which have secondary functionality. Use this whenever you want to check
         // module types for calculations. Dont use it when you are looking for main functionality as defined in the xml (for instance - ship design screen)
@@ -274,6 +275,7 @@ namespace Ship_Game.Ships
             float healthChange = newHealth - Health;
             Health = newHealth;
             OnFire = (newHealth / maxHealth) < OnFireThreshold;
+            Parent.OnHealthChange(healthChange);
 
             if (!fromSave) // do not trigger Die() or Resurrect() during savegame loading
             {
@@ -286,7 +288,6 @@ namespace Ship_Game.Ships
                     ResurrectModule();
                 }
             }
-            Parent.AddShipHealth(healthChange);
         }
 
         public void UpdateShieldPowerMax(float shieldAmplify)
@@ -308,8 +309,6 @@ namespace Ship_Game.Ships
 
         public bool IsHangarShipActive => TryGetHangarShip(out Ship ship) && ship.Active;
         public bool TryGetHangarShipActive(out Ship ship) => TryGetHangarShip(out ship) && ship.Active;
-
-        public override bool ParentIsThis(Ship ship) => Parent == ship;
 
         ShipModule() : base(GameObjectType.ShipModule)
         {
@@ -893,16 +892,15 @@ namespace Ship_Game.Ships
                 for (int i = 0; i < 30; ++i)
                 {
                     Vector3 pos = parentAlive ? center : new Vector3(Parent.Center, UniverseRandom.RandomBetween(-25f, 25f));
-                    Empire.Universe.Particles.Explosion.AddParticleThreadA(pos, Vector3.Zero);
+                    Empire.Universe.Particles.Explosion.AddParticle(pos);
                 }
 
-                SpawnDebris(Area, Parent.Velocity,0);
+                SpawnDebris(Area, Parent.Velocity, 0);
             }
 
             Active = false;
-            Parent.shipStatusChanged = true;
-            Parent.ShouldRecalculatePower |= ActualPowerFlowMax > 0 || PowerRadius > 0;
-            Parent.UpdateExternalSlots(this, becameActive: false);
+            SetHealth(0f);
+            Parent.OnModuleDeath(this);
 
             if (!cleanupOnly && source != null)
             {
@@ -915,6 +913,12 @@ namespace Ship_Game.Ships
                         ignoresShields: true, damageAmount: ExplosionDamage, damageRadius: ExplosionRadius);
                 }
             }
+        }
+
+        void ResurrectModule()
+        {
+            Active = true;
+            Parent.OnModuleResurrect(this);
         }
 
         void SpawnDebris(int size, Vector2 velocity, int count, bool ignite = true)
@@ -1074,14 +1078,6 @@ namespace Ship_Game.Ships
             newShipToLink.AI.OrderReturnToHangar();
         }
 
-        void ResurrectModule()
-        {
-            Active = true;
-            Parent.shipStatusChanged = true;
-            Parent.ShouldRecalculatePower = true;
-            Parent.UpdateExternalSlots(this, becameActive: true);
-        }
-
         public override void Update(FixedSimTime timeStep)
         {
             if (Active && Health < 1f)
@@ -1209,7 +1205,7 @@ namespace Ship_Game.Ships
                 modelZ = modelZ.Clamped(0, 200) * -1;
                 Vector3 repairEffectOrigin = Center.ToVec3(modelZ);
                 for (int i = 0; i < 50; i++)
-                    Empire.Universe.Particles.Sparks.AddParticleThreadB(repairEffectOrigin, Vector3.Zero);
+                    Empire.Universe.Particles.Sparks.AddParticle(repairEffectOrigin);
             }
         }
 
@@ -1456,7 +1452,10 @@ namespace Ship_Game.Ships
             }
         }
 
-        public override string ToString() => $"{UID}  {Id}  x {Position.X} y {Position.Y}  size {XSIZE}x{YSIZE}  world={Center}  Ship={Parent?.Name}";
+        public override string ToString()
+        {
+            return $"{UID}  {Id}  {XSIZE}x{YSIZE} {Restrictions} [{Position.X};{Position.Y}] hp={Health} world={Center} ship={Parent?.Name}";
+        }
 
         public void Dispose()
         {

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.IO;
 using Ship_Game.Data.Yaml;
 
@@ -15,6 +14,7 @@ namespace Ship_Game.Data.Serialization.Types
         {
             ElemType = elemType;
             ElemSerializer = elemSerializer;
+            IsCollection = true;
         }
 
         public override object Convert(object value)
@@ -58,32 +58,11 @@ namespace Ship_Game.Data.Serialization.Types
             }
             return base.Deserialize(node); // try to deserialize value as Array
         }
-        
 
-        public override void Serialize(TextSerializerContext context, object obj)
+        public override void Serialize(YamlNode parent, object obj)
         {
-            // [StarData] Array<Ship> Ships;
-            // Ships:
-            //   - Ship: ship1
-            //     Position: ...
-            //   - Ship: ship2
-            //     Position: ...
             var array = (Array)obj;
-            int count = array.Length;
-
-            context.Writer.Write(new string(' ', context.Depth));
-            context.Writer.Write("- ");
-
-            context.Depth += 2;
-            context.IgnoreSpacePrefixOnce = true;
-
-            for (int i = 0; i < count; ++i)
-            {
-                object element = array.GetValue(i);
-                ElemSerializer.Serialize(context, element);
-            }
-
-            context.Depth -= 2;
+            ArrayListSerializer.Serialize(array, ElemSerializer, parent);
         }
 
         public override void Serialize(BinaryWriter writer, object obj)

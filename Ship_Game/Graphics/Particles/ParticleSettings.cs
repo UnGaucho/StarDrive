@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Ship_Game.Data;
 using Ship_Game.Data.Serialization;
 using Ship_Game.Data.Yaml;
 
@@ -12,6 +13,14 @@ namespace Ship_Game
     {
         [StarData] public string Name;
         [StarData] public string TextureName;
+        [StarData] public string Effect;
+        
+        // if true, particle never disappears and cannot move (but may rotate)
+        [StarData] public bool Static;
+
+        // if true, particle is only rendered when game camera is deemed as "nearView"
+        [StarData] public bool OnlyNearView;
+
         [StarData] public int MaxParticles = 100;
         [StarData] public TimeSpan Duration = TimeSpan.FromSeconds(1.0);
         [StarData] public float DurationRandomness;
@@ -20,7 +29,6 @@ namespace Ship_Game
         [StarData] public float MaxHorizontalVelocity;
         [StarData] public float MinVerticalVelocity;
         [StarData] public float MaxVerticalVelocity;
-        [StarData] public Vector3 Gravity = Vector3.Zero;
         [StarData] public float EndVelocity = 1f;
         [StarData] public Color MinColor = Color.White;
         [StarData] public Color MaxColor = Color.White;
@@ -33,11 +41,21 @@ namespace Ship_Game
         [StarData] public Blend SourceBlend = Blend.SourceAlpha;
         [StarData] public Blend DestinationBlend = Blend.InverseSourceAlpha;
 
+
+        // Is this a rotating particle? important for effect technique selection
+        public bool IsRotating => MinRotateSpeed != 0f || MaxRotateSpeed != 0f;
+
         static Map<string, ParticleSettings> Settings = new Map<string, ParticleSettings>();
+
+        public ParticleSettings Clone()
+        {
+            return (ParticleSettings)MemberwiseClone();
+        }
 
         public static void LoadAll()
         {
             GameLoadingScreen.SetStatus("LoadParticles");
+            
             FileInfo file = ResourceManager.GetModOrVanillaFile("3DParticles/Particles.yaml");
             LoadParticles(file);
             GameBase.ScreenManager.AddHotLoadTarget(null, "Particles", file.FullName, LoadParticles);
@@ -55,15 +73,16 @@ namespace Ship_Game
             using (var parser = new YamlParser(file))
             {
                 Array<ParticleSettings> list = parser.DeserializeArray<ParticleSettings>();
-                foreach (ParticleSettings set in list)
+                foreach (ParticleSettings ps in list)
                 {
-                    if (Settings.ContainsKey(set.Name))
+                    if (Settings.ContainsKey(ps.Name))
                     {
-                        Log.Error($"ParticleSetting duplicate definition='{set.Name}' in Particles.yaml. Ignoring.");
+                        Log.Error($"ParticleSetting duplicate definition='{ps.Name}' in Particles.yaml. Ignoring.");
                     }
                     else
                     {
-                        Settings.Add(set.Name, set);
+                        Settings.Add(ps.Name, ps);
+                        ps.GetEffect(ResourceManager.RootContent); // compile
                     }
                 }
             }
@@ -77,6 +96,16 @@ namespace Ship_Game
             if (!Settings.TryGetValue(name, out ParticleSettings ps))
                 throw new InvalidDataException($"Unknown ParticleSettings Name: {name}");
             return ps;
+        }
+
+        public Effect GetEffect(GameContentManager content)
+        {
+            return content.LoadEffect("3DParticles/" + Effect);
+        }
+
+        public Texture2D GetTexture(GameContentManager content)
+        {
+            return content.Load<Texture2D>("3DParticles/" + TextureName);
         }
     }
 }

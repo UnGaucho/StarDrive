@@ -16,6 +16,7 @@ namespace Ship_Game.Data.YamlSerializer
 
         public YamlSerializer(Type type) : base(type)
         {
+            IsUserClass = true;
         }
 
         protected override TypeSerializerMap CreateTypeMap()
@@ -71,48 +72,44 @@ namespace Ship_Game.Data.YamlSerializer
             return item;
         }
 
-        public override void Serialize(TextSerializerContext context, object obj)
+        bool HasOnlyPrimitiveFields
+        {
+            get
+            {
+                foreach (KeyValuePair<string, DataField> kv in Mapping)
+                {
+                    if (kv.Value.Serializer.IsCollection || kv.Value.Serializer.IsUserClass)
+                        return false;
+                }
+                return true;
+            }
+        }
+
+        public override void Serialize(YamlNode parent, object obj)
         {
             if (Mapping == null)
                 ResolveTypes();
 
-            context.Depth += 2;
-
-            var tw = context.Writer;
-            string prefixSpaces = new string(' ', context.Depth);
-
-            // serialize each field using the resolved serializers from TypeSerializerMap
             foreach (KeyValuePair<string, DataField> kv in Mapping)
             {
-                if (context.IgnoreSpacePrefixOnce)
-                    context.IgnoreSpacePrefixOnce = false;
-                else
-                    tw.Write(prefixSpaces);
-
-                tw.Write(kv.Key);
-                tw.Write(": ");
-                kv.Value.Serialize(context, obj);
-                tw.Write('\n');
+                var childNode = new YamlNode
+                {
+                    Key = kv.Key
+                };
+                parent.AddSubNode(childNode);
+                kv.Value.Serialize(childNode, obj);
             }
-
-            context.Depth -= 2;
         }
 
         public override void Serialize(TextWriter writer, object obj)
         {
-            if (Mapping == null)
-                ResolveTypes();
-
-            var context = new TextSerializerContext
+            var root = new YamlNode
             {
-                Writer = writer,
-                Depth = 0,
+                Key = TheType.Name
             };
 
-            writer.Write(TheType.Name);
-            writer.Write(":\n");
-
-            Serialize(context, obj);
+            Serialize(root, obj);
+            root.SerializeTo(writer);
         }
 
         public override void Serialize(BinaryWriter writer, object obj)

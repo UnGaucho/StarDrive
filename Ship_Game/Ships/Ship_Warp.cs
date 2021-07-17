@@ -65,7 +65,8 @@ namespace Ship_Game.Ships
 
             if (warpStatus <= Status.Poor)
             {
-                if (warpStatus == Status.Critical) HyperspaceReturn();
+                if (warpStatus == Status.Critical) 
+                    HyperspaceReturn();
             }
             else if (!IsSpoolingOrInWarp)
             {

@@ -1142,7 +1142,8 @@ namespace Ship_Game.Fleets
                     TaskStep = 9;
                     break;
                 case 9: // waiting for colonization goal to issue orders to this fleet
-                    if (!DoOrbitTaskArea(task, excludeInvade: true))
+                    task.AO = task.TargetPlanet?.Center ?? task.AO;
+                     if (!DoOrbitTaskArea(task, excludeInvade: true))
                         AttackEnemyStrengthClumpsInAO(task);
 
                     break;
@@ -1825,7 +1826,8 @@ namespace Ship_Game.Fleets
         bool AttackEnemyStrengthClumpsInAO(MilitaryTask task, IEnumerable<Ship> ships)
         {
             var availableShips = new Array<Ship>(ships);
-            if (availableShips.Count == 0) return false;
+            if (availableShips.Count == 0) 
+                return false;
 
             Map<Vector2, float> enemyClumpsDict = Owner.GetEmpireAI().ThreatMatrix
                 .PingRadarStrengthClusters(task.AO, task.AORadius, 10000, Owner);
@@ -2331,9 +2333,12 @@ namespace Ship_Game.Fleets
         // @return The Final destination position for this ship
         public Vector2 GetFinalPos(Ship ship)
         {
-            if (CommandShip?.InCombat == true && FinalPosition.InRadius(CommandShip.Center, CommandShip.AI.FleetNode.OrdersRadius))
+            if (ship != CommandShip && CommandShip?.InCombat == true && FinalPosition.InRadius(CommandShip.Center, CommandShip.AI.FleetNode.OrdersRadius))
                 return CommandShip.Center + ship.FleetOffset;
-            
+
+            if (FinalPosition == Vector2.Zero)
+                return CommandShip?.Center ?? Vector2.Zero;
+
             return FinalPosition + ship.FleetOffset;
         }
 

@@ -486,10 +486,11 @@ namespace Ship_Game.AI
                 for (int i = 0; i < pins1.Length; i++)
                 {
                     Pin pin = pins1[i];
-                    if (pin?.Position.InRadius(position, radius) != true) continue;
+                    if (pin?.Position.InRadius(position, radius) != true) 
+                        continue;
                     Empire pinEmpire = pin.Ship?.loyalty ?? pin.GetEmpire();
                     {
-                        if (us.IsEmpireHostile(pinEmpire))
+                        if (us.IsEmpireAttackable(pinEmpire))
                             pins.Add(pin);
                     }
                 }

@@ -83,7 +83,7 @@ namespace Ship_Game.AI.ShipMovement
 
             if (distance > 15000f) // we are still far away, thrust towards the planet
             {
-                AI.ThrustOrWarpToPos(orbitTarget.Center, timeStep);
+                AI.ThrustOrWarpToPos(orbitTarget.Center, timeStep, Owner.SpeedLimit);
                 OrbitPos         = orbitTarget.Center + OrbitOffset;
                 OrbitUpdateTimer = 0f;
                 return;

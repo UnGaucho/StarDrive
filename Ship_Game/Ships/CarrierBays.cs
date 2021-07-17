@@ -460,7 +460,7 @@ namespace Ship_Game.Ships
                         continue;
                     }
 
-                    slowestFighterSpeed  = hangarShip.SpeedLimit.UpperBound(slowestFighterSpeed);
+                    slowestFighterSpeed  = hangarShip.VelocityMaximum.UpperBound(slowestFighterSpeed);
                     float rangeToCarrier = hangarShip.Center.Distance(Owner.Center);
                     if (hangarShip.EMPdisabled
                         || !hangarShip.hasCommand
@@ -492,7 +492,8 @@ namespace Ship_Game.Ships
                 return false;
             }
 
-            Owner.SetSpeedLimit((slowestFighterSpeed * 0.25f).UpperBound(Owner.SpeedLimit));
+            float speedLimit = Owner.SpeedLimit > 0 ? Owner.SpeedLimit : slowestFighterSpeed;
+            Owner.SetSpeedLimit((slowestFighterSpeed * 0.25f).UpperBound(speedLimit));
             return true;
         }
 

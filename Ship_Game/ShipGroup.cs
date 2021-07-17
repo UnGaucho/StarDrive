@@ -602,8 +602,8 @@ namespace Ship_Game
 
         protected CombatStatus CombatStatusOfShipInArea(Ship ship, Vector2 position, float radius)
         {
-            float combatRadius = Math.Min(radius, ship.AI.FleetNode.OrdersRadius);
-            if (!ship.CanTakeFleetOrders || ship.Center.OutsideRadius(position + ship.FleetOffset, combatRadius))
+            float combatRadius = ship.AI.FleetNode.OrdersRadius > 0 ? Math.Min(radius, ship.AI.FleetNode.OrdersRadius) : radius;
+            if (!ship.CanTakeFleetOrders || ship.Center.OutsideRadius(position, combatRadius))
                 return CombatStatus.ClearSpace;
 
             if (ship.InCombat) return CombatStatus.InCombat;

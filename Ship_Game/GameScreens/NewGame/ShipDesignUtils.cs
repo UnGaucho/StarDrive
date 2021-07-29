@@ -55,33 +55,33 @@ namespace Ship_Game.GameScreens.NewGame
 
         static void MarkDefaultUnlockable(Map<Technology, Array<string>> shipTechs)
         {
-            foreach (ShipData hull in ResourceManager.Hulls)
+            foreach (ShipHull hull in ResourceManager.Hulls)
             {
                 if (hull.Role == ShipData.RoleName.disabled)
                     continue;
 
-                hull.UnLockable = false;
+                hull.Unlockable = false;
                 foreach (Technology tech in shipTechs.Keys)
                 {
                     if (tech.HullsUnlocked.Count == 0) continue;
                     foreach (Technology.UnlockedHull hulls in tech.HullsUnlocked)
                     {
-                        if (hulls.Name == hull.Hull)
+                        if (hulls.Name == hull.HullName)
                         {
                             foreach (string tree in shipTechs[tech])
                             {
                                 hull.TechsNeeded.Add(tree);
-                                hull.UnLockable = true;
+                                hull.Unlockable = true;
                             }
                             break;
                         }
                     }
-                    if (hull.UnLockable)
+                    if (hull.Unlockable)
                         break;
                 }
 
                 if (hull.Role < ShipData.RoleName.fighter || hull.TechsNeeded.Count == 0)
-                    hull.UnLockable = true;
+                    hull.Unlockable = true;
             }
         }
 
@@ -101,7 +101,7 @@ namespace Ship_Game.GameScreens.NewGame
                 if (shipData.HullRole == ShipData.RoleName.disabled)
                     continue;
 
-                if (shipData.BaseHull.UnLockable)
+                if (shipData.BaseHull.Unlockable)
                 {
                     foreach (string str in shipData.BaseHull.TechsNeeded)
                         shipData.TechsNeeded.Add(str);

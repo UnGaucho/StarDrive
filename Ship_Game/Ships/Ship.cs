@@ -65,6 +65,8 @@ namespace Ship_Game.Ships
         public bool IsReadonlyDesign;
         public bool isColonyShip;
         public bool HasRegeneratingModules;
+        public bool IsMeteor { get; private set; }
+
         Planet TetheredTo;
         public Vector2 TetherOffset;
         public Guid TetherGuid;
@@ -128,7 +130,6 @@ namespace Ship_Game.Ships
         public float ShieldRechargeTimer;
         public bool InCombat;
         public float xRotation;
-        public bool ShouldRecalculatePower;
         public bool Deleted;
         public float BonusEMP_Protection;
         public bool InSensorRange => KnownByEmpires.KnownByPlayer;
@@ -460,7 +461,7 @@ namespace Ship_Game.Ships
                 return;
             if (beam.Owner == null || beam.Weapon == null)
                 return;
-            Vector2 repulsion = (Center - beam.Owner.Center) * beam.Weapon.RepulsionDamage;
+            Vector2 repulsion = (Position - beam.Owner.Position) * beam.Weapon.RepulsionDamage;
             ApplyForce(repulsion);
         }
 
@@ -507,8 +508,9 @@ namespace Ship_Game.Ships
                     if (InFrustum && Empire.Universe?.IsShipViewOrCloser == true)
                     {
                         // visualize radiation hits on external modules
+                        Vector3 center = module.Center3D;
                         for (int j = 0; j < 50; j++)
-                            Empire.Universe.Particles.Sparks.AddParticle(module.GetCenter3D);
+                            Empire.Universe.Particles.Sparks.AddParticle(center);
                     }
                 }
             }
@@ -709,7 +711,7 @@ namespace Ship_Game.Ships
         // Calculates estimated trip time by turns
         public float GetAstrogateTimeTo(Planet destination)
         {
-            float distance    = Center.Distance(destination.Center);
+            float distance    = Position.Distance(destination.Center);
             float distanceSTL = destination.GravityWellForEmpire(loyalty);
             Planet planet     = System?.IdentifyGravityWell(this); // Get the gravity well owner if the ship is in one
 
@@ -729,9 +731,9 @@ namespace Ship_Game.Ships
 
         private float GetAstrogateTime(float distance, float distanceSTL, Vector2 targetPos)
         {
-            float angleDiff = Center.AngleToTarget(targetPos) - RotationDegrees;
+            float angleDiff = Position.AngleToTarget(targetPos) - RotationDegrees;
             if (angleDiff > 180)
-                angleDiff = 360 - Center.AngleToTarget(targetPos) + RotationDegrees;
+                angleDiff = 360 - Position.AngleToTarget(targetPos) + RotationDegrees;
 
             float rotationTime = angleDiff / RotationRadiansPerSecond.ToDegrees().LowerBound(1);
             float distanceFTL  = Math.Max(distance - distanceSTL, 0);
@@ -744,7 +746,7 @@ namespace Ship_Game.Ships
         public void TetherToPlanet(Planet p)
         {
             TetheredTo = p;
-            TetherOffset = Center - p.Center;
+            TetherOffset = Position - p.Center;
         }
 
         public Planet GetTether()
@@ -776,7 +778,7 @@ namespace Ship_Game.Ships
         }
 
         public bool InRadius(Vector2 worldPos, float radius)
-            => Center.InRadius(worldPos, Radius + radius);
+            => Position.InRadius(worldPos, Radius + radius);
 
         public bool CheckRangeToTarget(Weapon w, GameplayObject target)
         {
@@ -807,7 +809,7 @@ namespace Ship_Game.Ships
             }
 
             float range = attackRunRange + w.BaseRange;
-            return target.Center.InRadius(w.Module.Center, range);
+            return target.Position.InRadius(w.Module.Position, range);
         }
 
         // Added by McShooterz
@@ -828,7 +830,7 @@ namespace Ship_Game.Ships
             }
 
             ShipModule m = w.Module;
-            return RadMath.IsTargetInsideArc(m.Center, target.Center,
+            return RadMath.IsTargetInsideArc(m.Position, target.Position,
                                              Rotation + m.FacingRadians, m.FieldOfFire);
         }
 
@@ -836,7 +838,7 @@ namespace Ship_Game.Ships
         public bool IsInsideFiringArc(Weapon w, Vector2 pickedPos)
         {
             ShipModule m = w.Module;
-            return RadMath.IsTargetInsideArc(m.Center, pickedPos,
+            return RadMath.IsTargetInsideArc(m.Position, pickedPos,
                                              Rotation + m.FacingRadians, m.FieldOfFire);
         }
 
@@ -915,63 +917,6 @@ namespace Ship_Game.Ships
                 slots[i] = new ModuleSlotData(ModuleSlotList[i]);
             }
             return slots;
-        }
-
-        private string GetConduitGraphic(ShipModule forModule)
-        {
-            var conduit = new ConduitGraphic();
-            foreach (ShipModule module in ModuleSlotList)
-                if (module.ModuleType == ShipModuleType.PowerConduit)
-                    conduit.Add((int)(module.XMLPosition.X - forModule.XMLPosition.X),
-                                (int)(module.XMLPosition.Y - forModule.XMLPosition.Y));
-            return conduit.GetGraphic();
-        }
-
-        public struct ConduitGraphic
-        {
-            public bool Right;
-            public bool Left;
-            public bool Down;
-            public bool Up;
-            public void Add(int dx, int dy)
-            {
-                AddGridPos(dx / 16, dy / 16);
-            }
-            public void AddGridPos(int dx, int dy)
-            {
-                Left  |= dx == -1 && dy == 0;
-                Right |= dx == +1 && dy == 0;
-                Down  |= dx ==  0 && dy == -1;
-                Up    |= dx ==  0 && dy == +1;
-            }
-            public int Sides => (Left?1:0) + (Right?1:0) + (Down?1:0) + (Up?1:0);
-            public string GetGraphic()
-            {
-                switch (Sides)
-                {
-                    case 1:
-                        if (Down)  return "Conduits/conduit_powerpoint_down";
-                        if (Up)    return "Conduits/conduit_powerpoint_up";
-                        if (Left)  return "Conduits/conduit_powerpoint_right";
-                        if (Right) return "Conduits/conduit_powerpoint_left";
-                        break;
-                    case 2:
-                        if (Left && Down)  return "Conduits/conduit_corner_BR";
-                        if (Left && Up)    return "Conduits/conduit_corner_TR";
-                        if (Right && Down) return "Conduits/conduit_corner_BL";
-                        if (Right && Up)   return "Conduits/conduit_corner_TL";
-                        if (Down && Up)    return "Conduits/conduit_straight_vertical";
-                        if (Left && Right) return "Conduits/conduit_straight_horizontal";
-                        break;
-                    case 3:
-                        if (!Right)  return "Conduits/conduit_tsection_left";
-                        if (!Left)   return "Conduits/conduit_tsection_right";
-                        if (!Down)   return "Conduits/conduit_tsection_down";
-                        if (!Up)     return "Conduits/conduit_tsection_up";
-                        break;
-                }
-                return "Conduits/conduit_intersection";
-            }
         }
 
         // if enemy ships get within guard mode range, ships will enter combat
@@ -1115,37 +1060,6 @@ namespace Ship_Game.Ships
             return speeds.Avg();
         }
 
-        public void OnModuleDeath(ShipModule m)
-        {
-            shipStatusChanged = true;
-            if (m.PowerDraw > 0 || m.ActualPowerFlowMax > 0 || m.PowerRadius > 0)
-                ShouldRecalculatePower = true;
-            if (m.isExternal)
-                UpdateExternalSlots(m, becameActive: false);
-            if (m.HasInternalRestrictions)
-            {
-                SetActiveInternalSlotCount(ActiveInternalSlotCount - m.Area);
-            }
-
-            // kill the ship if all modules exploded or internal slot percent is below critical
-            if (Health <= 0f || InternalSlotsHealthPercent < ShipResupply.ShipDestroyThreshold)
-            {
-                Die(LastDamagedBy, false);
-            }
-        }
-
-        public void OnModuleResurrect(ShipModule m)
-        {
-            shipStatusChanged = true; // update ship status sometime in the future (can be 1 second)
-            if (m.PowerDraw > 0 || m.ActualPowerFlowMax > 0 || m.PowerRadius > 0)
-                ShouldRecalculatePower = true;
-            UpdateExternalSlots(m, becameActive: true);
-            if (m.HasInternalRestrictions)
-            {
-                SetActiveInternalSlotCount(ActiveInternalSlotCount + m.Area);
-            }
-        }
-
         public void SetActiveInternalSlotCount(int activeInternalSlots)
         {
             ActiveInternalSlotCount = activeInternalSlots;
@@ -1221,8 +1135,8 @@ namespace Ship_Game.Ships
                 float cos = RadMath.Cos(Rotation);
                 float sin = RadMath.Sin(Rotation);
                 float tan = (float)Math.Tan(yRotation);
-                float parentX = Center.X;
-                float parentY = Center.Y;
+                float parentX = Position.X;
+                float parentY = Position.Y;
                 float rotation = Rotation;
                 for (int i = 0; i < ModuleSlotList.Length; ++i)
                 {
@@ -1309,11 +1223,13 @@ namespace Ship_Game.Ships
             // Repair
             if (Health < HealthMax)
             {
-                if (!InCombat || (GlobalStats.ActiveModInfo != null && GlobalStats.ActiveModInfo.UseCombatRepair))
+                if (CanRepair)
                 {
                     // Added by McShooterz: Priority repair
-                    float repair = InCombat ? RepairRate * 0.1f : RepairRate;
+                    float repair = AI.BadGuysNear ? RepairRate * 0.1f : RepairRate;
                     ApplyAllRepair(repair, Level);
+                    if (AI.State == AIState.Flee && HealthPercent > ShipResupply.DamageThreshold(shipData.ShipCategory))
+                        AI.OrderAwaitOrders(); // Stop fleeing and get back into combat if needed
                 }
 
                 if (!EMPdisabled)
@@ -1326,6 +1242,8 @@ namespace Ship_Game.Ships
             if (!AI.BadGuysNear)
                 ShieldManager.RemoveShieldLights(Shields);
         }
+
+        public bool CanRepair => !AI.BadGuysNear || GlobalStats.ActiveModInfo != null && GlobalStats.ActiveModInfo.UseCombatRepair;
 
         void PerformRegeneration()
         {
@@ -1500,16 +1418,18 @@ namespace Ship_Game.Ships
 
         void NotifyPlayerIfDiedExploring()
         {
-            if (AI.State == AIState.Explore && loyalty.isPlayer)
+            if (loyalty.isPlayer && AI.IsExploring)
+            {
                 Empire.Universe.NotificationManager.AddExplorerDestroyedNotification(this);
+            }
         }
 
         void ExplodeShip(float size, bool addWarpExplode)
         {
-            if (!InFrustum || !IsVisibleToPlayer) 
+            if (!InFrustum || !IsVisibleToPlayer)
                 return;
 
-            var position = new Vector3(Center.X, Center.Y, -100f);
+            var position = new Vector3(Position.X, Position.Y, -100f);
 
             float boost = 1f;
             if (GlobalStats.HasMod)
@@ -1518,13 +1438,13 @@ namespace Ship_Game.Ships
             ExplosionManager.AddExplosion(position, Velocity,
                 PlanetCrash != null ? size * 0.05f : size * boost, 12f, ExplosionType.Ship);
 
-            if (PlanetCrash != null)
-                return;
+            if (PlanetCrash == null)
+            {
+                if (addWarpExplode)
+                    ExplosionManager.AddExplosion(position, Velocity, size * 1.75f, 12f, ExplosionType.Warp);
 
-            if (addWarpExplode)
-                ExplosionManager.AddExplosion(position, Velocity, size*1.75f, 12f, ExplosionType.Warp);
-
-            UniverseScreen.Spatial.ShipExplode(this, size * 50, Center, Radius);
+                UniverseScreen.Spatial.ShipExplode(this, size * 50, Position, Radius);
+            }
         }
 
         public void InstantKill()
@@ -1536,17 +1456,19 @@ namespace Ship_Game.Ships
         // cleanupOnly: for tumbling ships that are already dead
         public override void Die(GameplayObject source, bool cleanupOnly)
         {
-            ++DebugInfoScreen.ShipsDied;
-            Projectile pSource = source as Projectile;
-            if (!cleanupOnly)
-            {
-                pSource?.Module?.GetParent().UpdateEmpiresOnKill(this);
-                pSource?.Module?.GetParent().AddKill(this);
-            }
+            if (!Active)
+                return; // already dead
 
+            var pSource = source as Projectile;
             reallyDie = cleanupOnly || WillShipDieNow(pSource);
             if (dying && !reallyDie)
-                return;
+                return; // planet crash or tumble
+
+            QueueTotalRemoval(); // sets Active=false
+            
+            ++DebugInfoScreen.ShipsDied;
+            pSource?.Module?.GetParent().UpdateEmpiresOnKill(this);
+            pSource?.Module?.GetParent().AddKill(this);
 
             if (pSource?.Owner != null)
             {
@@ -1566,42 +1488,40 @@ namespace Ship_Game.Ships
                 GameAudio.PlaySfxAsync(dieSoundEffect, SoundEmitter);
             }
 
-            NotifyPlayerIfDiedExploring();
             Carrier.ScuttleHangarShips();
             ResetProjectorInfluence();
 
+            NotifyPlayerIfDiedExploring();
+            loyalty.TryAutoRequisitionShip(fleet, this);
+
             float size = Radius * (shipData.EventOnDeath?.NotEmpty() == true ? 3 : 1);
-            if (Active)
+            switch (shipData.HullRole)
             {
-                Active = false;
-                switch (shipData.HullRole)
-                {
-                    case ShipData.RoleName.corvette:
-                    case ShipData.RoleName.scout:
-                    case ShipData.RoleName.fighter:
-                    case ShipData.RoleName.frigate:   ExplodeShip(size * 10, cleanupOnly); break;
-                    case ShipData.RoleName.battleship:
-                    case ShipData.RoleName.capital:
-                    case ShipData.RoleName.cruiser:
-                    case ShipData.RoleName.station:   ExplodeShip(size * 8, true);         break;
-                    default:                          ExplodeShip(size * 8, cleanupOnly);  break;
-                }
+                case ShipData.RoleName.corvette:
+                case ShipData.RoleName.scout:
+                case ShipData.RoleName.fighter:
+                case ShipData.RoleName.frigate:   ExplodeShip(size * 10, cleanupOnly); break;
+                case ShipData.RoleName.battleship:
+                case ShipData.RoleName.capital:
+                case ShipData.RoleName.cruiser:
+                case ShipData.RoleName.station:   ExplodeShip(size * 8, true);         break;
+                default:                          ExplodeShip(size * 8, cleanupOnly);  break;
+            }
 
-                if (!HasExploded)
+            if (!HasExploded)
+            {
+                HasExploded = true;
+                if (PlanetCrash == null && visible)
                 {
-                    HasExploded = true;
-                    if (PlanetCrash != null || !visible)
-                        return;
-
                     // Added by RedFox - spawn flaming spacejunk when a ship dies
-                    float radSqrt   = (float)Math.Sqrt(Radius);
+                    float radSqrt = (float)Math.Sqrt(Radius);
                     float junkScale = (radSqrt * 0.05f).UpperBound(1.4f); // trial and error, depends on junk model sizes // bigger doesn't look good
 
                     //Log.Info("Ship.Explode r={1} rsq={2} junk={3} scale={4}   {0}", Name, Radius, radSqrt, explosionJunk, junkScale);
                     for (int x = 0; x < 3; ++x)
                     {
                         int howMuchJunk = (int)RandomMath.RandomBetween(Radius * 0.05f, Radius * 0.15f);
-                        SpaceJunk.SpawnJunk(howMuchJunk, Center.GenerateRandomPointOnCircle(Radius/2),
+                        SpaceJunk.SpawnJunk(howMuchJunk, Position.GenerateRandomPointOnCircle(Radius / 2),
                             Velocity, this, Radius, junkScale, true);
                     }
                 }
@@ -1613,11 +1533,6 @@ namespace Ship_Game.Ships
                 Empire.Universe.ScreenManager.AddScreen(
                     new EventPopup(Empire.Universe, EmpireManager.Player, evt, evt.PotentialOutcomes[0], true));
             }
-
-            loyalty.TryAutoRequisitionShip(fleet, this);
-
-            QueueTotalRemoval();
-            base.Die(source, cleanupOnly);
         }
 
         bool WillShipDieNow(Projectile proj)
@@ -1629,28 +1544,29 @@ namespace Ship_Game.Ships
             {
                 // 35% the ship will not explode immediately, but will start tumbling out of control
                 // we mark the ship as dying and the main update loop will set reallyDie
-                int tumbleSeconds = UniverseRandom.IntBetween(4, 8);
                 if (PlanetCrash.GetPlanetToCrashOn(this, out Planet planet))
                 {
-                    dying       = true;
+                    dying = true;
                     PlanetCrash = new PlanetCrash(planet, this, Stats.Thrust);
                 }
 
                 if (InFrustum)
                 {
-                    dying         = true;
+                    dying = true;
+                    dietimer = UniverseRandom.IntBetween(4, 8);
+                }
+
+                if (dying)
+                {
                     DieRotation.X = UniverseRandom.RandomBetween(-1f, 1f) * 50f / SurfaceArea;
                     DieRotation.Y = UniverseRandom.RandomBetween(-1f, 1f) * 50f / SurfaceArea;
                     DieRotation.Z = UniverseRandom.RandomBetween(-1f, 1f) * 50f / SurfaceArea;
-                    dietimer      = tumbleSeconds;
-                    return false;
+                    return false; // ship will really die later
                 }
             }
 
             return true;
         }
-
-        public bool IsMeteor => ModuleSlotList.Any(m => m.UID == "MeteorPart");
 
         public void SetReallyDie()
         {
@@ -1668,6 +1584,10 @@ namespace Ship_Game.Ships
             TetherGuid = Guid.Empty;
         }
 
+        /// <summary>
+        /// Sets ship as Inactive and marks it for removal from UniverseObjectManager
+        /// during next Objects.Update()
+        /// </summary>
         public void QueueTotalRemoval()
         {
             Active = false;

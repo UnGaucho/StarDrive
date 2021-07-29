@@ -296,6 +296,14 @@ namespace Ship_Game
                                         && !IsCapitalOrOutpost
                                         && MaxPopIncrease.AlmostZero(); // FB - pop relevant because of CA
 
+        [XmlIgnore] [JsonIgnore]
+        public bool IsEventTerraformer => IsCommodity && PlusTerraformPoints > 0;
+
+        public bool GoodFlatProduction(Planet p) =>
+            PlusFlatProductionAmount > 0 || PlusProdPerRichness > 0 && p.MineralRichness > 0.2f;
+
+        public bool GoodFlatFood() => PlusFlatFoodAmount > 0;
+
         static float Production(Planet planet, float flatBonus, float perColonistBonus, float adjust = 1)
         {
             return flatBonus + perColonistBonus * planet.PopulationBillion * adjust;
@@ -376,7 +384,7 @@ namespace Ship_Game
         public void OnBuildingBuiltAt(Planet p)
         {
             p.AddBuildingsFertility(MaxFertilityOnBuild);
-            p.MineralRichness += IncreaseRichness.LowerBound(0); //This must be positive. since richness cannot go below 0.
+            p.MineralRichness += IncreaseRichness.LowerBound(0); // This must be positive. since richness cannot go below 0.
             p.BuildingList.Add(this);
             if (IsSpacePort && Empire.Universe != null)
             {
@@ -398,6 +406,9 @@ namespace Ship_Game
                 ExplorationEvent e = ResourceManager.Event(EventOnBuild);
                 u.ScreenManager.AddScreen(new EventPopup(u, u.PlayerEmpire, e, e.PotentialOutcomes[0], true, p));
             }
+
+            if (IsCapital)
+                p.RemoveOutpost();
 
             UpdateOffense(p.Level);
         }

@@ -12,11 +12,9 @@ namespace UnitTests.Ships
     {
         public ShipAITests()
         {
-            CreateGameInstance();
             LoadStarterShips("Excalibur-Class Supercarrier", "Owlwok Freighter S");
             CreateUniverseAndPlayerEmpire();
         }
-
 
         [TestMethod]
         public void IsTargetValidTest()
@@ -178,8 +176,8 @@ namespace UnitTests.Ships
 
             SetEnvironment(us, theirShip, ourRelation, () =>
             {
-                ourShip.AI.HasPriorityTarget    = true;
-                ourRelation.Treaty_Alliance     = true;
+                ourShip.AI.HasPriorityTarget = true;
+                ourRelation.Treaty_Alliance = true;
             });
             Empire.UpdateBilateralRelations(us, Enemy);
             Assert.IsFalse(ourShip.AI.IsTargetValid(theirShip), "Player Chooses Alliance Target: " + GetFailString(us, ourShip, theirShip, ourRelation));

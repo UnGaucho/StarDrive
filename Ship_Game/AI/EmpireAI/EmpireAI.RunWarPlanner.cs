@@ -159,6 +159,7 @@ namespace Ship_Game.AI
                         DiplomacyScreen.Show(OwnerEmpire, player, "Declare War Imperialism");
                     }
                     break;
+                case WarType.GenocidalWar:
                 case WarType.DefensiveWar:
                     if (aiRelationToPlayer.Treaty_NAPact)
                     {
@@ -182,9 +183,7 @@ namespace Ship_Game.AI
                         aiRelationToPlayer.Trust -= 25f;
                     }
                     break;
-                case WarType.GenocidalWar:
-                    break;
-                case WarType.SkirmishWar:
+                case WarType.SkirmishWar: // no diplo for player. Pirates use skirmish wars
                     break;
             }
         }

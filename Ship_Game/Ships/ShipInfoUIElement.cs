@@ -342,7 +342,7 @@ namespace Ship_Game.Ships
                     case ResupplyReason.NotNeeded:
                         if (ship.HealthPercent < ShipResupply.RepairDoneThreshold && (ship.AI.State == AIState.Resupply || ship.AI.State == AIState.ResupplyEscort))
                             text = $"Repairing Ship by Resupply ({(int)(ship.HealthPercent * 100)}%)";
-                        else if (!ship.InCombat && ship.HealthPercent.Less(1))
+                        else if (ship.CanRepair && ship.HealthPercent.Less(1))
                         {
                             text = $"Self Repairing Ship ({(int)(ship.HealthPercent * 100)}%)";
                             color = Color.Yellow;
@@ -472,8 +472,8 @@ namespace Ship_Game.Ships
             {
                 Empire.Universe.ViewingShip = false;
                 Empire.Universe.AdjustCamTimer = 0.5f;
-                Empire.Universe.CamDestination.X = Ship.Center.X;
-                Empire.Universe.CamDestination.Y = Ship.Center.Y;
+                Empire.Universe.CamDestination.X = Ship.Position.X;
+                Empire.Universe.CamDestination.Y = Ship.Position.Y;
                 if (Empire.Universe.viewState < UniverseScreen.UnivScreenState.SystemView)
                     Empire.Universe.CamDestination.Z = Empire.Universe.GetZfromScreenState(UniverseScreen.UnivScreenState.SystemView);
             }

@@ -13,6 +13,8 @@ namespace Ship_Game.Ships
         ShipModule[] ModuleSlotList;
         ShipModule[] SparseModuleGrid;   // single dimensional grid, for performance reasons
         ShipModule[] ExternalModuleGrid; // only contains external modules
+        public PowerGrid PwrGrid;
+
         public int NumExternalSlots { get; private set; }
 
         /// <summary>  Ship slot (1x1 modules) width </summary>
@@ -20,12 +22,13 @@ namespace Ship_Game.Ships
         
         /// <summary>Ship slot (1x1 modules) height </summary>
         public int GridHeight { get; private set; }
-        Vector2 GridOrigin; // local origin, eg -32, -48
+        protected Vector2 GridOrigin; // local origin, eg -32, -48
         
         static bool EnableDebugGridExport = false;
 
         public ShipModule[] Modules => ModuleSlotList;
         public bool HasModules => ModuleSlotList != null && ModuleSlotList.Length != 0;
+
 
         void CreateModuleGrid(in ShipGridInfo gridInfo, bool shipyardDesign)
         {
@@ -53,6 +56,7 @@ namespace Ship_Game.Ships
             GridHeight = info.Size.Y;
             SparseModuleGrid   = new ShipModule[GridWidth * GridHeight];
             ExternalModuleGrid = new ShipModule[GridWidth * GridHeight];
+            PwrGrid = new PowerGrid(SparseModuleGrid, GridWidth, GridHeight, GridOrigin);
 
             // Ship's true radius is half of Module Grid's Diagonal Length
             Radius = 0.5f * gridInfo.Span.Length();
@@ -110,7 +114,7 @@ namespace Ship_Game.Ships
 
         bool IsModuleOverlappingInternalSlot(ShipModule module, bool[] internalGrid)
         {
-            ModulePosToGridPoint(module.Position, out int x, out int y);
+            ModulePosToGridPoint(module, out int x, out int y);
             int endX = x + module.XSIZE;
             int endY = y + module.YSIZE;
             for (; y < endY; ++y)
@@ -189,7 +193,7 @@ namespace Ship_Game.Ships
             if (!GetModuleAt(SparseModuleGrid, x, y, out ShipModule module))
                 return false;
 
-            ModulePosToGridPoint(module.Position, out x, out y); // now get the true topleft root coordinates of module
+            ModulePosToGridPoint(module, out x, out y); // now get the true topleft root coordinates of module
             if (ShouldBeExternal(x, y, module))
             {
                 if (!module.isExternal)
@@ -220,7 +224,7 @@ namespace Ship_Game.Ships
         // updates the isExternal status of a module, depending on whether it died or resurrected
         public void UpdateExternalSlots(ShipModule module, bool becameActive)
         {
-            ModulePosToGridPoint(module.Position, out int x, out int y);
+            ModulePosToGridPoint(module, out int x, out int y);
 
             if (becameActive) // we resurrected, so add us to external module grid and update all surrounding slots
                 AddExternalModule(module, x, y, GetQuadrantEstimate(x, y));
@@ -243,13 +247,20 @@ namespace Ship_Game.Ships
 
         void UpdateGridSlot(ShipModule[] sparseGrid, ShipModule module, bool becameActive)
         {
-            ModulePosToGridPoint(module.Position, out int x, out int y);
+            ModulePosToGridPoint(module, out int x, out int y);
             UpdateGridSlot(sparseGrid, x, y, module, becameActive);
         }
 
         void ModulePosToGridPoint(Vector2 moduleLocalPos, out int x, out int y)
         {
             Vector2 offset = moduleLocalPos - GridOrigin;
+            x = (int)Math.Floor(offset.X / 16f);
+            y = (int)Math.Floor(offset.Y / 16f);
+        }
+
+        void ModulePosToGridPoint(ShipModule m, out int x, out int y)
+        {
+            Vector2 offset = m.GetLegacyGridPos() - GridOrigin;
             x = (int)Math.Floor(offset.X / 16f);
             y = (int)Math.Floor(offset.Y / 16f);
         }
@@ -261,20 +272,25 @@ namespace Ship_Game.Ships
             return module != null;
         }
 
+        public ShipModule GetModuleAt(Point gridPos)
+        {
+            return SparseModuleGrid[gridPos.X + gridPos.Y*GridWidth];
+        }
+
         static void DebugDrawShield(ShipModule s)
         {
             var color = s.ShieldsAreActive ? Color.AliceBlue : Color.DarkBlue;
-            Empire.Universe.DebugWin?.DrawCircle(DebugModes.SpatialManager, s.Center, s.ShieldHitRadius, color, 2f);
+            Empire.Universe.DebugWin?.DrawCircle(DebugModes.SpatialManager, s.Position, s.ShieldHitRadius, color, 2f);
         }
 
         static void DebugDrawShieldHit(ShipModule s)
         {
-            Empire.Universe.DebugWin?.DrawCircle(DebugModes.SpatialManager, s.Center, s.ShieldHitRadius, Color.BlueViolet, 2f);
+            Empire.Universe.DebugWin?.DrawCircle(DebugModes.SpatialManager, s.Position, s.ShieldHitRadius, Color.BlueViolet, 2f);
         }
 
         static void DebugDrawShieldHit(ShipModule s, Vector2 start, Vector2 end)
         {
-            Empire.Universe.DebugWin?.DrawCircle(DebugModes.SpatialManager, s.Center, s.ShieldHitRadius, Color.BlueViolet, 2f);
+            Empire.Universe.DebugWin?.DrawCircle(DebugModes.SpatialManager, s.Position, s.ShieldHitRadius, Color.BlueViolet, 2f);
             if (start != end)
                 Empire.Universe.DebugWin?.DrawLine(DebugModes.SpatialManager, start, end, 2f, Color.BlueViolet, 2f);
         }
@@ -330,7 +346,7 @@ namespace Ship_Game.Ships
             {
                 ShipModule m = Shields[i];
                 float power = m.ShieldPower;
-                if (power > maxPower && m.HitTestShield(internalModule.Center, internalModule.Radius))
+                if (power > maxPower && m.HitTestShield(internalModule.Position, internalModule.Radius))
                     shield = m;
             }
             return shield != null;
@@ -341,7 +357,7 @@ namespace Ship_Game.Ships
         // Converts a world position to a grid local position (such as [16f,32f])
         public Vector2 WorldToGridLocal(Vector2 worldPoint)
         {
-            Vector2 offset = worldPoint - Center;
+            Vector2 offset = worldPoint - Position;
             return offset.RotatePoint(-Rotation) - GridOrigin;
         }
 
@@ -387,7 +403,7 @@ namespace Ship_Game.Ships
         public Vector2 GridLocalToWorld(Vector2 localPoint)
         {
             Vector2 centerLocal = GridOrigin + localPoint;
-            return centerLocal.RotatePoint(Rotation) + Center;
+            return centerLocal.RotatePoint(Rotation) + Position;
         }
 
         public Vector2 GridLocalPointToWorld(Point gridLocalPoint)
@@ -696,7 +712,7 @@ namespace Ship_Game.Ships
                 if (module == null)
                     return shield;
 
-                if (shield == null || module.Center.Distance(startPos) < shieldHitDist)
+                if (shield == null || module.Position.Distance(startPos) < shieldHitDist)
                     return module; // module was closer, so should be hit first
             }
             return shield;
@@ -741,7 +757,7 @@ namespace Ship_Game.Ships
         // -- Higher crew level means the missile will pick the most optimal target module ;) --
         ShipModule TargetRandomInternalModule(Vector2 projPos, int level, float sqSearchRange)
         {
-            ShipModule[] modules = ModuleSlotList.Filter(m => m.Active && projPos.SqDist(m.Center) < sqSearchRange);
+            ShipModule[] modules = ModuleSlotList.Filter(m => m.Active && projPos.SqDist(m.Position) < sqSearchRange);
             if (modules.Length == 0)
                 return null;
 
@@ -759,7 +775,7 @@ namespace Ship_Game.Ships
         // This is called for guided weapons to pick a new target
         public ShipModule GetRandomInternalModule(Weapon source)
         {
-            Vector2 center    = source.Owner?.Center ?? source.Origin;
+            Vector2 center    = source.Owner?.Position ?? source.Origin;
             int level         = source.Owner?.Level  ?? 0;
             float searchRange = source.BaseRange + 100;
             return TargetRandomInternalModule(center, level, searchRange*searchRange);
@@ -768,9 +784,9 @@ namespace Ship_Game.Ships
         // This is called for initial missile guidance ChooseTarget(), so range is not that important
         public ShipModule GetRandomInternalModule(Projectile source)
         {
-            Vector2 projPos = source.Owner?.Center ?? source.Center;
+            Vector2 projPos = source.Owner?.Position ?? source.Position;
             int level       = source.Owner?.Level  ?? 0;
-            float searchRange = projPos.SqDist(Center) + 48*48; // only pick modules that are "visible" to the projectile
+            float searchRange = projPos.SqDist(Position) + 48*48; // only pick modules that are "visible" to the projectile
             return TargetRandomInternalModule(projPos, level, searchRange);
         }
 

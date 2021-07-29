@@ -31,7 +31,7 @@ namespace Ship_Game.Ships
                 IncomingSupply.Add(supply, 0);
         }
 
-        private static float DamageThreshold(ShipData.Category category)
+        public static float DamageThreshold(ShipData.Category category)
         {
             float threshold;
             switch (category)
@@ -105,7 +105,7 @@ namespace Ship_Game.Ships
         public void ResupplyFromButton()
         {
             if (Ship.IsHangarShip)
-                Ship.AI.OrderReturnToHangar();
+                Ship.AI.OrderReturnToHangarDeferred();
             else
                 Ship.AI.GoOrbitNearestPlanetAndResupply(true);
         }

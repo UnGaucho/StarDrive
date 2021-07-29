@@ -259,11 +259,14 @@ namespace Ship_Game.AI.ExpansionAI
 
         public void CheckClaim(Empire thievingEmpire, Relationship thiefRelationship, Planet claimedPlanet)
         {
-            if (Owner.isPlayer || Owner.isFaction || !thiefRelationship.Known)
+            if (Owner.isPlayer
+                || Owner.isFaction
+                || !thiefRelationship.Known
+                || thiefRelationship.AtWar
+                || !claimedPlanet.ParentSystem.HasPlanetsOwnedBy(thievingEmpire)) // this empire does not have planets here
+            {
                 return;
-
-            if (!claimedPlanet.ParentSystem.HasPlanetsOwnedBy(thievingEmpire) || thiefRelationship.AtWar)
-                return;
+            }
 
             bool newTheft = false;
             if (thiefRelationship.WarnedSystemsList.Contains(claimedPlanet.ParentSystem.guid))
@@ -310,8 +313,8 @@ namespace Ship_Game.AI.ExpansionAI
                 return false; // All systems were explored or are marked by someone else
 
             // Sort by distance from explorer center
-            potentials.Sort(s => ship.Center.SqDist(s.Position));
-            potentialHostiles.Sort(s => ship.Center.SqDist(s.Position));
+            potentials.Sort(s => ship.Position.SqDist(s.Position));
+            potentialHostiles.Sort(s => ship.Position.SqDist(s.Position));
             potentials.AddRange(potentialHostiles); // revisit hostile not full explored lastly
 
             targetSystem = potentials.First();

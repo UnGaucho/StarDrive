@@ -17,11 +17,17 @@ namespace UnitTests.Universe
         //protected Array<Ship> AllShips = new Array<Ship>();
         protected Array<GameplayObject> AllObjects = new Array<GameplayObject>();
 
+
         protected TestSpatialCommon()
         {
-            CreateGameInstance(800, 800, mockInput:false);
-            LoadStarterShipVulcan();
+            EnableMockInput(false);
             CreateUniverseAndPlayerEmpire();
+        }
+
+        [TestCleanup]
+        public void Teardown()
+        {
+            EnableMockInput(true);
         }
 
         protected abstract ISpatial Create(int worldSize);
@@ -225,8 +231,7 @@ namespace UnitTests.Universe
             {
                 foreach (Ship ship in AllObjects)
                 {
-                    ship.Center.X += 10f;
-                    ship.Position = ship.Center;
+                    ship.Position.X += 10f;
                     ship.UpdateModulePositions(TestSimStep, true, forceUpdate: true);
                 }
                 var t = new PerfTimer();
@@ -293,8 +298,7 @@ namespace UnitTests.Universe
                     {
                         if (AllObjects[i] is Ship ship)
                         {
-                            ship.Center.X += 10f;
-                            ship.Position = ship.Center;
+                            ship.Position.X += 10f;
                             ship.UpdateModulePositions(TestSimStep, true, forceUpdate: true);
 
                             if (rand.Next(100) <= 10 && !spawned.Contains(ship)) // 10% chance
@@ -360,7 +364,7 @@ namespace UnitTests.Universe
         [TestMethod]
         public void CollisionPerformance()
         {
-            ISpatial tree = CreateQuadTree(100_000, 10_000);
+            ISpatial tree = CreateQuadTree(40_000, 2_000);
 
             int x = 0;
             foreach (GameplayObject go in AllObjects.ToArray())

@@ -32,9 +32,9 @@ namespace Ship_Game.Ships
 
         public void Update(FixedSimTime timeStep)
         {
-            Vector2 dir = Owner.Position.DirectionToTarget(CrashPos);
-            Owner.Position += dir.Normalized() * Thrust.UpperBound(200) * timeStep.FixedTime;
-            Scale = Owner.Position.Distance(CrashPos) / Distance;
+            Vector2 dir    = Owner.Position.DirectionToTarget(CrashPos);
+            Owner.Velocity = dir * (Owner.MaxSTLSpeed * 0.8f).LowerBound(200);
+            Scale          = Owner.Position.Distance(CrashPos) / Distance;
 
             if (Owner.Position.InRadius(CrashPos, 200))
             {
@@ -83,7 +83,7 @@ namespace Ship_Game.Ships
             for (int i = 0; i < ship.System.PlanetList.Count; i++)
             {
                 Planet p = ship.System.PlanetList[i];
-                if (ship.Center.InRadius(p.Center, p.GravityWellRadius * 0.5f)
+                if (ship.Position.InRadius(p.Center, p.GravityWellRadius * 0.5f)
                    || ship.IsPlatformOrStation && ship.GetTether() == p)
                 {
                     planet = p;

@@ -47,6 +47,7 @@ namespace Ship_Game.AI
             FiringAtMainTarget= (1 << 7),
             BadShipsNear      = (1 << 8),
             BadPlanetsNear    = (1 << 9),
+            ReturnToHangarSoon = (1 << 10),
             BadShipsOrPlanetsNear = BadShipsNear | BadPlanetsNear,
         }
 
@@ -85,6 +86,9 @@ namespace Ship_Game.AI
         public bool IsFiringAtMainTarget
         { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => Bit(Flags.FiringAtMainTarget); 
           [MethodImpl(MethodImplOptions.AggressiveInlining)] private set => Bit(Flags.FiringAtMainTarget, value); }
+        bool ReturnToHangarSoon
+        { [MethodImpl(MethodImplOptions.AggressiveInlining)] get => Bit(Flags.ReturnToHangarSoon); 
+          [MethodImpl(MethodImplOptions.AggressiveInlining)] set => Bit(Flags.ReturnToHangarSoon, value); }
 
         public ShipAI(Ship owner)
         {
@@ -196,10 +200,19 @@ namespace Ship_Game.AI
             }
         }
 
+        /// <summary>
+        /// Check if a ship has an exploration order
+        ///
+        /// A ship can have Evade/Escape order during exploration, hack workaround is to iterate orders queue
+        /// </summary>
+        public bool IsExploring => State == AIState.Explore
+                                || ExplorationTarget != null
+                                || OrderQueue.Any(g => g.Plan == Plan.Explore);
+
         void Colonize(ShipGoal shipGoal)
         {
             Planet targetPlanet = shipGoal.TargetPlanet;
-            if (Owner.Center.OutsideRadius(targetPlanet.Center, 2000f))
+            if (Owner.Position.OutsideRadius(targetPlanet.Center, 2000f))
             {
                 DequeueCurrentOrder();
                 OrderColonization(targetPlanet, shipGoal.Goal);
@@ -226,19 +239,19 @@ namespace Ship_Game.AI
             if (system.IsFullyExploredBy(Owner.loyalty))
                 return false;
 
-            planet = system.PlanetList.FindMinFiltered(p => !p.IsExploredBy(Owner.loyalty), p => Owner.Center.SqDist(p.Center));
+            planet = system.PlanetList.FindMinFiltered(p => !p.IsExploredBy(Owner.loyalty), p => Owner.Position.SqDist(p.Center));
             return planet != null;
         }
 
         void DoScrapShip(FixedSimTime timeStep, ShipGoal goal)
         {
-            if (goal.TargetPlanet.Center.Distance(Owner.Center) >= goal.TargetPlanet.ObjectRadius * 3)
+            if (goal.TargetPlanet.Center.Distance(Owner.Position) >= goal.TargetPlanet.ObjectRadius * 3)
             {
                 Orbit.Orbit(goal.TargetPlanet, timeStep);
                 return;
             }
 
-            if (goal.TargetPlanet.Center.Distance(Owner.Center) >= goal.TargetPlanet.ObjectRadius)
+            if (goal.TargetPlanet.Center.Distance(Owner.Position) >= goal.TargetPlanet.ObjectRadius)
             {
                 ThrustOrWarpToPos(goal.TargetPlanet.Center, timeStep, 200f);
                 return;
@@ -262,8 +275,16 @@ namespace Ship_Game.AI
             ResetStateFlee();
 
             Owner.loyalty.data.Traits.ApplyTraitToShip(Owner);
+
             UpdateUtilityModuleAI(timeStep);
             ThrustTarget = Vector2.Zero;
+
+            // deferred return to hangar
+            if (ReturnToHangarSoon)
+            {
+                ReturnToHangarSoon = false;
+                OrderReturnToHangar();
+            }
 
             UpdateCombatStateAI(timeStep);
 
@@ -275,11 +296,11 @@ namespace Ship_Game.AI
 
         public Ship NearBySupplyShip => FriendliesNearby.FindMinFiltered(
             supply => supply.Carrier.HasSupplyBays && supply.SupplyShipCanSupply,
-            supply => -supply.Center.SqDist(Owner.Center));
+            supply => supply.Position.SqDist(Owner.Position));
 
         public Ship NearByRepairShip => FriendliesNearby.FindMinFiltered(
             supply => supply.hasRepairBeam || supply.HasRepairModule,
-            supply => -supply.Center.SqDist(Owner.Center));
+            supply => supply.Position.SqDist(Owner.Position));
 
         public void ProcessResupply(ResupplyReason resupplyReason)
         {
@@ -301,7 +322,7 @@ namespace Ship_Game.AI
                         return;
                     }
 
-                    nearestRallyPoint = Owner.loyalty.FindNearestSafeRallyPoint(Owner.Center);
+                    nearestRallyPoint = Owner.loyalty.FindNearestSafeRallyPoint(Owner.Position);
                     break;
                 case ResupplyReason.RequestResupplyFromPlanet:
                     RequestResupplyFromPlanet();
@@ -312,7 +333,7 @@ namespace Ship_Game.AI
                     if (repairShip != null)
                         SetUpSupplyEscort(repairShip, supplyType: "Repair");
                     else
-                        nearestRallyPoint = Owner.loyalty.FindNearestSafeRallyPoint(Owner.Center);
+                        nearestRallyPoint = Owner.loyalty.FindNearestSafeRallyPoint(Owner.Position);
                     break;
                 case ResupplyReason.LowTroops:
                     if (Owner.Carrier.SendTroopsToShip)
@@ -357,13 +378,12 @@ namespace Ship_Game.AI
                 OrderResupply(nearestRallyPoint, cancelOrders);
             else
             {
-                nearestRallyPoint = Owner.loyalty.FindNearestRallyPoint(Owner.Center);
-                if (nearestRallyPoint != null)
-                    OrderResupply(nearestRallyPoint, cancelOrders);
-                else if (Owner.loyalty.WeArePirates)
-                    OrderPirateFleeHome();
-                else
-                    OrderFlee(true);
+                nearestRallyPoint = Owner.loyalty.FindNearestRallyPoint(Owner.Position);
+
+                if      (nearestRallyPoint != null)   OrderResupply(nearestRallyPoint, cancelOrders);
+                else if (Owner.loyalty.WeArePirates)  OrderPirateFleeHome();
+                else if (Owner.loyalty.WeAreRemnants) OrderRemnantFlee();
+                else                                  OrderFlee();
             }
         }
 
@@ -399,7 +419,7 @@ namespace Ship_Game.AI
             if (possiblePlanets.Length == 0)
                 return;
 
-            Planet planet = possiblePlanets.FindMin(p => p.Center.SqDist(Owner.Center));
+            Planet planet = possiblePlanets.FindMin(p => p.Center.SqDist(Owner.Position));
             ai.AddPlanetaryRearmGoal(Owner, planet);
         }
 
@@ -544,11 +564,11 @@ namespace Ship_Game.AI
             return false;
         }
 
-        bool NearFleetPosition() => Owner.Center.InRadius(Owner.fleet.GetFinalPos(Owner), 75f);
+        bool NearFleetPosition() => Owner.Position.InRadius(Owner.fleet.GetFinalPos(Owner), 75f);
 
         bool ShouldReturnToFleet()
         {
-            if (Owner.Center.InRadius(Owner.fleet.GetFormationPos(Owner), 400))
+            if (Owner.Position.InRadius(Owner.fleet.GetFormationPos(Owner), 400))
                 return false;
             // separated for clarity as this section can be very confusing.
             // we might need a toggle for the player action here.
@@ -580,7 +600,7 @@ namespace Ship_Game.AI
             if (ShouldReturnToFleet())
             {
                 // check if inside minimum warp jump range. If not do a full warp process.
-                if (Owner.fleet.FinalPosition.InRadius(Owner.Center, 7500))
+                if (Owner.fleet.FinalPosition.InRadius(Owner.Position, 7500))
                 {
                     SetPriorityOrder(true);  // FB this might cause serious issues that make orbiting ships stuck with PO and not available anymore for the AI.
                     State = AIState.AwaitingOrders;
@@ -637,7 +657,7 @@ namespace Ship_Game.AI
                 // blockade is going on for too long or manual quarantine, abort
                 ClearOrders();
                 State = AIState.AwaitingOrders;
-                Planet fallback = Owner.loyalty.FindNearestRallyPoint(Owner.Center);
+                Planet fallback = Owner.loyalty.FindNearestRallyPoint(Owner.Position);
                 if (fallback != planet)
                     AddOrbitPlanetGoal(fallback, AIState.AwaitingOrders);
 
@@ -721,11 +741,15 @@ namespace Ship_Game.AI
 
         void DoMeteor(FixedSimTime timeStep, ShipGoal g)
         {
-            if (Owner.SecondsAlive > 1 &&  Owner.System == null)
+            if (Owner.SecondsAlive > 1 && Owner.System == null)
                 Owner.Die(null, true);
 
-            Owner.Position += g.Direction.Normalized() * g.SpeedLimit * timeStep.FixedTime;
-            if (Owner.Position.InRadius(g.TargetPlanet.Center, g.TargetPlanet.GravityWellRadius * 0.75f))
+            // constant velocity, no acceleration
+            // Ship Sim should take care of the rest
+            Owner.Velocity = g.Direction * g.SpeedLimit;
+            Owner.MaxSTLSpeed = g.SpeedLimit;
+
+            if (Owner.Position.InRadius(g.TargetPlanet.Center, g.TargetPlanet.GravityWellRadius * 0.5f))
             {
                 Owner.PlanetCrash = new PlanetCrash(g.TargetPlanet, Owner, g.SpeedLimit*0.85f);
                 Owner.dying       = true;
@@ -804,7 +828,7 @@ namespace Ship_Game.AI
             }
 
             if (Owner.GetStrength() <= 0
-                || !Owner.IsHangarShip && escortTarget.Center.InRadius(Owner.Center, Owner.SensorRange)
+                || !Owner.IsHangarShip && escortTarget.Position.InRadius(Owner.Position, Owner.SensorRange)
                 || !Owner.IsHangarShip
                 || !Owner.Mothership.AI.BadGuysNear
                 || escortTarget != Owner.Mothership)
@@ -823,7 +847,7 @@ namespace Ship_Game.AI
                 return;
             }
 
-            if (Owner.InCombat && Owner.Center.OutsideRadius(escortTarget.Center, Owner.DesiredCombatRange))
+            if (Owner.InCombat && Owner.Position.OutsideRadius(escortTarget.Position, Owner.DesiredCombatRange))
             {
                 Owner.AI.SetPriorityOrder(true);
                 Orbit.Orbit(escortTarget, timeStep);
@@ -837,5 +861,8 @@ namespace Ship_Game.AI
             else
                 AwaitOrdersPlayer(timeStep);
         }
+
+        // For Unit tests
+        public Planet TestGetPatrolTarget() => PatrolTarget;
     }
 }

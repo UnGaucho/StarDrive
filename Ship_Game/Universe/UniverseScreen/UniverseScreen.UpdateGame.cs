@@ -288,7 +288,6 @@ namespace Ship_Game
                 for (int index = 0; index < JunkList.Count; ++index)
                     JunkList[index].Update(timeStep);
             }
-            SelectedShipList.ApplyPendingRemovals();
             EmpireMiscPerf.Stop();
         }
 
@@ -301,8 +300,8 @@ namespace Ship_Game
             for (int i = ourSSPs.Count - 1; i >= 0; i--)
             {
                 Ship projector = ourSSPs[i];
-                Vector2 center = projector.Center;
-                var sspInSameSpot = ourSSPs.Filter(s => s.Center.AlmostEqual(center, 1));
+                Vector2 center = projector.Position;
+                var sspInSameSpot = ourSSPs.Filter(s => s.Position.AlmostEqual(center, 1));
                 if (sspInSameSpot.Length > 1)
                 {
                     ((IEmpireShipLists)empire).RemoveShipAtEndOfTurn(projector);

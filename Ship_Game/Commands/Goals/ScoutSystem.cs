@@ -96,12 +96,12 @@ namespace Ship_Game.Commands.Goals
                 if (FinishedShip.TryGetScoutFleeVector(out Vector2 escapePos))
                     FinishedShip.AI.OrderMoveToNoStop(escapePos, FinishedShip.Direction.DirectionToTarget(escapePos), true, AIState.Flee);
                 else
-                    FinishedShip.AI.OrderFlee(true);
+                    FinishedShip.AI.OrderFlee();
 
                 return GoalStep.RestartGoal;
             }
 
-            return FinishedShip.Center.InRadius(FinishedShip.AI.ExplorationTarget.Position, 20000) 
+            return FinishedShip.Position.InRadius(FinishedShip.AI.ExplorationTarget.Position, 20000) 
                     ? GoalStep.GoalComplete 
                     : GoalStep.TryAgain;
         }

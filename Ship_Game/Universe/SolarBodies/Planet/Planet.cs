@@ -260,7 +260,7 @@ namespace Ship_Game
             MineralRichness   = minerals;
             BasePopPerTileVal = maxPop;
             if (fertility > 0)
-                Type          = ResourceManager.RandomPlanet(PlanetCategory.Terran);
+                Type = ResourceManager.RandomPlanet(PlanetCategory.Terran);
         }
 
         public Planet(SolarSystem system, float randomAngle, float ringRadius, string name, float ringMax, Empire owner = null, float preDefinedPop = 0)
@@ -536,6 +536,9 @@ namespace Ship_Game
             }
 
             bool enemyInRange = ParentSystem.DangerousForcesPresent(Owner);
+            if (!enemyInRange)
+                SpaceCombatNearPlanet = false;
+
             if (NoSpaceCombatTargetsFoundDelay < 2f || enemyInRange)
             {
                 bool targetNear = false;
@@ -568,7 +571,7 @@ namespace Ship_Game
             for (int i = 0; i < ParentSystem.ShipList.Count; ++i)
             {
                 Ship ship = ParentSystem.ShipList[i];
-                if (ship?.Center.InRadius(Center, 15000) == true
+                if (ship?.Position.InRadius(Center, 15000) == true
                     && ship.BaseStrength > 10
                     && (!ship.IsTethered || ship.GetTether() == this) // orbitals orbiting another nearby planet
                     && Owner.IsEmpireAttackable(ship.loyalty))
@@ -605,7 +608,7 @@ namespace Ship_Game
                 if (ship.dying || ship.IsInWarp || !Owner.IsEmpireAttackable(ship.loyalty))
                     continue;
 
-                float dist = Center.SqDist(ship.Center);
+                float dist = Center.SqDist(ship.Position);
                 if (dist < closestTroop && (ship.IsSingleTroopShip || ship.IsDefaultAssaultShuttle || ship.IsBomber))
                 {
                     closestTroop = dist;
@@ -1047,7 +1050,7 @@ namespace Ship_Game
 
         public bool ShipWithinSensorRange(Ship ship)
         {
-            return ship.Center.Distance(Center) < SensorRange;
+            return ship.Position.Distance(Center) < SensorRange;
         }
 
         private static float CalcShipBuildingModifier(int numShipyards)
@@ -1152,7 +1155,7 @@ namespace Ship_Game
                     chance *= 1.5f; // No atmosphere, not able to burn during planetfall
 
                 chance *= 1 + ship.loyalty.data.Traits.ModHpModifier; // Skilled engineers (or not)
-                chance += ship.SurfaceArea / 100f;
+                chance += ship.SurfaceArea / (ship.IsMeteor ? 50f : 100f);
                 return chance.Clamped(1, 100);
             }
 
@@ -1414,9 +1417,9 @@ namespace Ship_Game
             var ships      = us.OwnedShips;
             var projectors = us.OwnedProjectors;
 
-            bool scanned = ships.Any(s => s.Active && s.Center.InRadius(Center, s.SensorRange));
+            bool scanned = ships.Any(s => s.Active && s.Position.InRadius(Center, s.SensorRange));
             if (!scanned)
-                scanned = projectors.Any(s => s.Active && s.Center.InRadius(Center, s.SensorRange));
+                scanned = projectors.Any(s => s.Active && s.Position.InRadius(Center, s.SensorRange));
 
             return scanned;
         }
@@ -1453,6 +1456,7 @@ namespace Ship_Game
 
         public void WipeOutColony(Empire attacker)
         {
+            SetHomeworld(false); // It is possible to capture a capital (it is exists), but it wont be rebuilt
             Population = 0f;
             if (Owner == null)
                 return;
@@ -1510,8 +1514,8 @@ namespace Ship_Game
         public int TotalMoneyBuildings   => TilesList.Count(tile => tile.BuildingOnTile &&  tile.Building.IsMoneyBuilding);
 
         public int TotalBuildings    => TilesList.Count(tile => tile.BuildingOnTile);
-        public bool TerraformingHere => BuildingList.Any(b => b.IsTerraformer);
-        public int  TerraformersHere => BuildingList.Count(b => b.IsTerraformer);
+        public bool TerraformingHere => BuildingList.Any(b => b.IsTerraformer || b.IsEventTerraformer);
+        public int  TerraformersHere => BuildingList.Count(b => b.IsTerraformer || b.IsEventTerraformer);
         public bool HasCapital       => BuildingList.Any(b => b.IsCapital);
 
 

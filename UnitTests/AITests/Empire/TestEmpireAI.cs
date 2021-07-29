@@ -21,13 +21,9 @@ namespace UnitTests.AITests.Empire
         // NOTE: This constructor is called every time a [TestMethod] is executed
         public TestEmpireAI()
         {
-            CreateGameInstance();
-            ResourceManager.TestOptions testOptions = ResourceManager.TestOptions.LoadPlanets;
-            testOptions |= ResourceManager.TestOptions.TechContent;
-            LoadStarterShips(testOptions,
-                             "Excalibur-Class Supercarrier", "Corsair", "Supply Shuttle",
+            LoadStarterShips("Excalibur-Class Supercarrier", "Corsair",
                              "Flak Fang", "Akagi-Class Mk Ia Escort Carrier", "Rocket Inquisitor",
-                             "Cordrazine Prototype", "Cordrazine Troop", "PLT-Defender", "Colony Ship");
+                             "Cordrazine Prototype", "Cordrazine Troop", "PLT-Defender");
 
             CreateUniverseAndPlayerEmpire("Cordrazine");
 
@@ -94,7 +90,10 @@ namespace UnitTests.AITests.Empire
         {
             var build = new RoleBuildInfo(10, Player.GetEmpireAI(), true);
             string shipName = Player.GetEmpireAI().GetAShip(build);
-            Assert.AreEqual("Rocket Inquisitor", shipName, "Build did not create expected ship");
+
+            // it should be random:
+            if (!(shipName == "Rocket Scout" || shipName == "Rocket Inquisitor"))
+                throw new AssertFailedException($"Build should have created Rocket Scout or Rocket Inquisitor but created: {shipName}");
         }
 
         [TestMethod]
@@ -451,84 +450,7 @@ namespace UnitTests.AITests.Empire
             Assert.AreEqual(0, Enemy.OwnedShips.Count);
         }
 
-        [TestMethod]
-        public void TestBudgetLoad()
-        {
-            var budget = new BudgetPriorities(Enemy);
-            int budgetAreas = Enum.GetNames(typeof(BudgetPriorities.BudgetAreas)).Length;
-            Assert.IsTrue(budget.Count() == budgetAreas);
-        }
-
-        [TestMethod]
-        public void TestTreasury()
-        {
-            var budget      = new BudgetPriorities(Enemy);
-            int budgetAreas = Enum.GetNames(typeof(BudgetPriorities.BudgetAreas)).Length;
-
-            Assert.IsTrue(budget.Count() == budgetAreas);
-
-            var eAI = Enemy.GetEmpireAI();
-
-            var colonyShip = SpawnShip("Colony Ship", Enemy, Vector2.Zero);
-            Enemy.UpdateEmpirePlanets();
-            Enemy.UpdateNetPlanetIncomes();
-            Enemy.GetEmpireAI().RunEconomicPlanner();
-
-            foreach (var planet in Universe.PlanetsDict.Values)
-            {
-                if (planet.Owner != Enemy)
-                {
-                    float maxPotential   = Enemy.MaximumStableIncome;
-                    float previousBudget = eAI.ProjectedMoney;
-                    planet.Colonize(colonyShip);
-                    Enemy.UpdateEmpirePlanets();
-                    Enemy.UpdateNetPlanetIncomes();
-                    float planetRevenue = planet.Money.PotentialRevenue;
-                    Assert.IsTrue(Enemy.MaximumStableIncome.AlmostEqual(maxPotential + planetRevenue,1f), "MaxStableIncome value was unexpected");
-                    eAI.RunEconomicPlanner();
-                    float expectedIncrease = planetRevenue * Enemy.data.treasuryGoal * 200;
-                    float actualValue      = eAI.ProjectedMoney;
-                    Assert.IsTrue(actualValue.AlmostEqual(previousBudget + expectedIncrease, 1f), "Projected Money value was unexpected");
-                }
-            }
-        }
-
-        [TestMethod]
-        public void TestTaxes()
-        {
-            var budget = new BudgetPriorities(Enemy);
-            int budgetAreas = Enum.GetNames(typeof(BudgetPriorities.BudgetAreas)).Length;
-
-            Assert.IsTrue(budget.Count() == budgetAreas);
-
-            var eAI = Enemy.GetEmpireAI();
-
-            var colonyShip = SpawnShip("Colony Ship", Enemy, Vector2.Zero);
-            Enemy.UpdateEmpirePlanets();
-            Enemy.UpdateNetPlanetIncomes();
-            Enemy.GetEmpireAI().RunEconomicPlanner();
-            Enemy.Money = 0;
-            Enemy.UpdateNormalizedMoney(Enemy.Money);
-            foreach (var planet in Universe.PlanetsDict.Values)
-            {
-                if (planet.Owner != Enemy)
-                {
-                    float previousTaxRate = Enemy.data.TaxRate;
-                    float previousBudget = eAI.ProjectedMoney;
-                    float money = Enemy.Money;
-                    planet.Colonize(colonyShip);
-                    Enemy.UpdateEmpirePlanets();
-                    Enemy.DoMoney();
-                    float planetRevenue = planet.Money.PotentialRevenue;
-                    //Assert.IsTrue(Enemy.MaximumStableIncome.AlmostEqual(maxPotential + planetRevenue, 1f), "MaxStableIncome value was unexpected");
-                    eAI.RunEconomicPlanner();
-                    float currentTaxRate = Enemy.data.TaxRate;
-                    float expectedIncrease = planetRevenue * Enemy.data.treasuryGoal * 200;
-                    float actualValue = eAI.ProjectedMoney;
-                    Assert.IsTrue(actualValue.AlmostEqual(previousBudget + expectedIncrease, 1f), "Projected Money value was unexpected");
-                }
-            }
-        }
+        
     }
 }
 

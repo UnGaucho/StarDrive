@@ -1,13 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Runtime;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Microsoft.Xna.Framework;
 using Ship_Game;
@@ -15,6 +8,7 @@ using Ship_Game.Data;
 using Ship_Game.Gameplay;
 using Ship_Game.GameScreens.NewGame;
 using Ship_Game.Ships;
+using UnitTests.Ships;
 using UnitTests.UI;
 
 namespace UnitTests
@@ -24,109 +18,35 @@ namespace UnitTests
     /// </summary>
     public class StarDriveTest : IDisposable
     {
-        public static string StarDriveAbsolutePath { get; private set; }
+        // Game and Content is shared between all StarDriveTests
+        public static TestGameDummy Game => StarDriveTestContext.Game;
+        public static GameContentManager Content => StarDriveTestContext.Content;
+        public static MockInputProvider MockInput => StarDriveTestContext.MockInput;
 
-        static StarDriveTest()
-        {
-            AppDomain.CurrentDomain.ProcessExit += CurrentDomain_ProcessExit;
-            
-            SetGameDirectory();
-            ResourceManager.InitContentDir();
-            try
-            {
-                var xna2 = Assembly.LoadFile(
-                    $"{StarDriveAbsolutePath}\\Microsoft.Xna.Framework.dll");
-                Console.WriteLine($"XNA Path: {xna2.Location}");
-            }
-            catch (FileNotFoundException e)
-            {
-                Console.WriteLine($"XNA Load Failed: {e.Message}\n{e.FileName}\n{e.FusionLog}");
-                throw;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"XNA Load Failed: {e.Message}\n");
-                throw;
-            }
-        }
-
-        static void CurrentDomain_ProcessExit(object sender, EventArgs e)
-        {
-            Cleanup();
-        }
-
-        public static void SetGameDirectory()
-        {
-            Directory.SetCurrentDirectory("../../../stardrive");
-            StarDriveAbsolutePath = Directory.GetCurrentDirectory();
-        }
-
-        public TestGameDummy Game { get; private set; }
-        public GameContentManager Content { get; private set; }
-        public MockInputProvider MockInput { get; private set; }
-
+        // Universe and Player/Enemy empires are specific for each test instance
         public UniverseScreen Universe { get; private set; }
         public Empire Player { get; private set; }
         public Empire Enemy { get; private set; }
         public Empire ThirdMajor { get; private set; }
         public Empire Faction { get; private set; }
 
-        public FixedSimTime TestSimStep { get; private set; } = new FixedSimTime(1f / 60f);
-        public VariableFrameTime TestVarTime { get; private set; } = new VariableFrameTime(1f / 60f);
+        public readonly FixedSimTime TestSimStep = new FixedSimTime(1f / 60f);
 
         public StarDriveTest()
         {
-            GlobalStats.LoadConfig();
-            Log.Initialize(enableSentry: false);
-            Log.VerboseLogging = true;
-
-            // This allows us to completely load UniverseScreen inside UnitTests
-            GlobalStats.DrawStarfield = false;
-            GlobalStats.DrawNebulas = false;
         }
 
-        static void Cleanup()
+        public static void EnableMockInput(bool enabled)
         {
-            Ship_Game.Parallel.ClearPool(); // Dispose all thread pool Threads
-            Log.Close();
-        }
-
-        // @note: This is slow! It can take 500-1000ms
-        // So don't create it if you don't need a valid GraphicsDevice
-        // Cases where you need this:
-        //  -- You need to create a new Universe
-        //  -- You need to load textures
-        //  -- You need to test any kind of GameScreen instance
-        //  -- You want to test a Ship
-        public void CreateGameInstance(int width=800, int height=600,
-                                       bool show=false, bool mockInput=true)
-        {
-            if (Game != null)
-                throw new InvalidOperationException("Game instance already created");
-
-            // Try to collect all memory before we continue, otherwise we can run out of memory
-            // in the unit tests because it doesn't collect memory by default
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, true);
-
-            var sw = Stopwatch.StartNew();
-            Game = new TestGameDummy(new AutoResetEvent(false), width, height, show);
-            Game.Create();
-            Content = Game.Content;
-            if (mockInput)
-                Game.Manager.input.Provider = MockInput = new MockInputProvider();
-            Log.Info($"CreateGameInstance elapsed: {sw.Elapsed.TotalMilliseconds}ms");
+            StarDriveTestContext.EnableMockInput(enabled);
         }
 
         public void Dispose()
         {
             DestroyUniverse();
-            Game?.Dispose();
-            Game = null;
-            Cleanup();
         }
 
-        void RequireGameInstance(string functionName)
+        static void RequireGameInstance(string functionName)
         {
             if (Game == null)
                 throw new Exception($"CreateGameInstance() must be called BEFORE {functionName}() !");
@@ -143,6 +63,10 @@ namespace UnitTests
         {
             RequireGameInstance(nameof(CreateUniverseAndPlayerEmpire));
             RequireStarterContentLoaded(nameof(CreateUniverseAndPlayerEmpire));
+
+            var sw = new Stopwatch();
+
+            EmpireManager.Clear();
 
             var data = new UniverseData();
             IEmpireData playerData = ResourceManager.MajorRaces[0];
@@ -163,6 +87,24 @@ namespace UnitTests
             Player.SetRelationsAsKnown(Enemy);
             Player.GetEmpireAI().DeclareWarOn(Enemy, WarType.BorderConflict);
             Empire.UpdateBilateralRelations(Player, Enemy);
+            
+            Log.Info($"CreateUniverseAndPlayerEmpire elapsed: {sw.Elapsed.TotalMilliseconds}ms");
+        }
+        
+        public void CreateDeveloperSandboxUniverse(string playerPreference, int numOpponents, bool paused)
+        {
+            var data = DeveloperUniverse.Create(playerPreference, numOpponents);
+            Empire.Universe = Universe = new DeveloperUniverse(data, data.EmpireList.First, paused);
+            Player = EmpireManager.Player;
+            Enemy  = EmpireManager.NonPlayerEmpires[0];
+        }
+
+        public void DestroyUniverse()
+        {
+            EmpireManager.Clear();
+            Empire.Universe?.ExitScreen();
+            Empire.Universe?.Dispose();
+            Empire.Universe = Universe = null;
         }
 
         public void CreateThirdMajorEmpire()
@@ -202,63 +144,60 @@ namespace UnitTests
             }
         }
 
-        public void CreateDeveloperSandboxUniverse(string playerPreference, int numOpponents, bool paused)
+        /// <summary>
+        /// Should be run after empires are created.
+        /// populates all shipdata techs.
+        /// unlocks all non shiptech. Locks all shiptechs.
+        /// Sets all ships to belong to Enemy Empire
+        /// Clears Ships WeCanBuild
+        /// </summary>
+        public void PrepareShipAndEmpireForShipTechTests()
         {
-            var data = DeveloperUniverse.Create(playerPreference, numOpponents);
-            SetUniverse(new DeveloperUniverse(data, data.EmpireList.First, paused));
+            ShipDesignUtils.MarkDesignsUnlockable(new ProgressCounter());
+            foreach (var ship in ResourceManager.GetShipTemplates())
+            {
+                ship.shipData.ShipStyle = Enemy.data.PortraitName;
+                ship.BaseHull.ShipStyle = Enemy.data.PortraitName;
+            }
+            Player.ShipsWeCanBuild.Clear();
+            Enemy.ShipsWeCanBuild.Clear();
+            var techs = Enemy.TechEntries;
+            foreach (var tech in techs)
+            {
+                if (tech.IsRoot)
+                    continue;
+
+                if (tech.ContainsShipTech())
+                    tech.Unlocked = false;
+                else
+                    tech.Unlocked = true;
+            }
         }
 
-        public void SetUniverse(UniverseScreen us)
+        /// <summary>
+        /// Since some Unit Tests have side-effects to global ships list
+        /// This can be used to reset starter ships
+        /// </summary>
+        public static void ReloadStarterShips()
         {
-            Empire.Universe = Universe = us;
-            Player = EmpireManager.Player;
-            Enemy  = EmpireManager.NonPlayerEmpires[0];
+            StarDriveTestContext.ReloadStarterShips();
         }
 
-        public void DestroyUniverse()
+        // Loads additional ships into ResourceManager
+        // If the ship is already loaded this will be a No-Op
+        public static void LoadStarterShips(params string[] shipList)
         {
-            Empire.Universe?.ExitScreen();
-            Empire.Universe?.Dispose();
-            Empire.Universe = Universe = null;
+            ResourceManager.LoadStarterShipsForTesting(shipList, null);
         }
 
-        public void LoadGameContent(ResourceManager.TestOptions options = ResourceManager.TestOptions.None)
+        public TestShip SpawnShip(string shipName, Empire empire, Vector2 position, Vector2 shipDirection = default)
         {
-            RequireGameInstance(nameof(LoadGameContent));
-            ResourceManager.LoadContentForTesting(options);
-        }
+            if (!ResourceManager.GetShipTemplate(shipName, out Ship template))
+                throw new Exception($"Failed to find ship template: {shipName} (did you call LoadStarterShips?)");
 
-        public void LoadStarterShips(params string[] shipList)
-        {
-            LoadStarterShips(ResourceManager.TestOptions.None, shipList);
-        }
-
-        public void LoadStarterShips(ResourceManager.TestOptions options, params string[] shipList)
-        {
-            RequireGameInstance(nameof(LoadStarterShips));
-            if (shipList == null)
-                throw new NullReferenceException(nameof(shipList));
-            ResourceManager.LoadStarterShipsForTesting(shipsList:shipList.Length == 0 ? null : shipList,
-                                                       savedDesigns:null, options);
-        }
-
-        public void LoadStarterShips(string[] starterShips, string[] savedDesigns,
-                                     ResourceManager.TestOptions options = ResourceManager.TestOptions.None)
-        {
-            RequireGameInstance(nameof(LoadStarterShips));
-            ResourceManager.LoadStarterShipsForTesting(starterShips, savedDesigns, options);
-        }
-
-        public void LoadStarterShipVulcan(ResourceManager.TestOptions options = ResourceManager.TestOptions.None)
-        {
-            LoadStarterShips(options, "Vulcan Scout", "Rocket Scout", "Laserclaw");
-        }
-        
-        public Ship SpawnShip(string shipName, Empire empire, Vector2 position, Vector2 shipDirection = default)
-        {
-            var target = Ship.CreateShipAtPoint(shipName, empire, position);
-            if (target == null)
-                throw new Exception($"Failed to create ship: {shipName} (did you call LoadStarterShips?)");
+            var target = new TestShip(template, empire, position);
+            if (!target.HasModules)
+                throw new Exception($"Failed to create ship modules: {shipName} (did you load modules?)");
 
             target.Rotation = shipDirection.Normalized().ToRadians();
             target.UpdateShipStatus(new FixedSimTime(0.01f)); // update module pos
@@ -268,50 +207,55 @@ namespace UnitTests
             return target;
         }
 
-        public void LoadPlanetContent()
-        {
-            RequireGameInstance(nameof(LoadPlanetContent));
-            ResourceManager.LoadPlanetContentForTesting();
-        }
-
-        public void LoadTechContent()
-        {
-            RequireGameInstance(nameof(LoadPlanetContent));
-            ResourceManager.LoadTechContentForTesting();
-        }
-
-        static void AddDummyPlanet(out Planet p)
+        SolarSystem AddDummyPlanet(out Planet p)
         {
             p = new Planet();
             var s = new SolarSystem();
-            s.PlanetList.Add(p);
-            p.ParentSystem = s;
+            AddPlanetToSolarSystem(s, p);
+            return s;
         }
 
-        public static void AddDummyPlanet(float fertility, float minerals, float pop, out Planet p)
+        public SolarSystem AddDummyPlanet(float fertility, float minerals, float pop, out Planet p)
         {
             p = new Planet(fertility, minerals, pop);
             var s = new SolarSystem();
-            s.PlanetList.Add(p);
-            p.ParentSystem = s;
+            AddPlanetToSolarSystem(s, p);
+            return s;
         }
 
-        public static void AddDummyPlanetToEmpire(Empire empire)
+        public SolarSystem AddDummyPlanetToEmpire(Empire empire)
         {
-            AddDummyPlanetToEmpire(empire, 0, 0, 0);
+            return AddDummyPlanetToEmpire(empire, 0, 0, 0);
         }
 
-        public static void AddDummyPlanetToEmpire(Empire empire, float fertility, float minerals, float maxPop)
+        public SolarSystem AddDummyPlanetToEmpire(Empire empire, float fertility, float minerals, float maxPop)
         {
-            AddDummyPlanet(fertility, minerals, maxPop, out Planet p);
+            var s = AddDummyPlanet(fertility, minerals, maxPop, out Planet p);
             empire?.AddPlanet(p);
+            p.Owner = empire;
             p.Type = ResourceManager.PlanetOrRandom(0);
+            return s;
         }
 
-        public static void AddHomeWorldToEmpire(Empire empire, out Planet p)
+        public SolarSystem AddHomeWorldToEmpire(Empire empire, out Planet p)
         {
-            AddDummyPlanet(out p);
+            var s = AddDummyPlanet(out p);
             p.GenerateNewHomeWorld(empire);
+            return s;
+        }
+
+        public void AddPlanetToSolarSystem(SolarSystem s, Planet p)
+        {
+            float distance = p.Center.Distance(s.Position);
+            var r = new SolarSystem.Ring() { Asteroids = false, OrbitalDistance = distance, planet = p };
+            s.RingList.Add(r);
+            p.ParentSystem = s;
+            s.PlanetList.Add(p);
+            if (Universe != null)
+            {
+                Universe.PlanetsDict[p.guid] = p;
+                Universe.SolarSystemDict[s.guid] = s;
+            }
         }
 
         public Array<Projectile> GetProjectiles(Ship ship)
@@ -322,24 +266,49 @@ namespace UnitTests
         {
             return GetProjectiles(ship).Count;
         }
-        public Beam[] GetBeams(Ship ship)
-        {
-            return Universe.Objects.GetBeams(ship);
-        }
 
         /// <summary>
         /// Loops up to `timeout` seconds While condition is True
-        /// Throws exception if timeout is reached and the test should fail
+        /// if `fatal` == true, throws exception if timeout is reached and the test should fail
         /// </summary>
-        public void LoopWhile(double timeout, Func<bool> condition, Action body)
+        /// <returns>TRUE if Loop completed without timeout, if `fatal` is set, then false if there was a timeout</returns>
+        public static bool LoopWhile((double timeout, bool fatal) timeout, Func<bool> condition, Action body)
         {
             var sw = Stopwatch.StartNew();
             while (condition())
             {
                 body();
-                if (sw.Elapsed.TotalSeconds > timeout)
-                    throw new TimeoutException("Timed out in LoopWhile");
+                if (sw.Elapsed.TotalSeconds > timeout.timeout)
+                {
+                    if (timeout.fatal)
+                        throw new TimeoutException("Timed out in LoopWhile");
+                    return false; // timed out
+                }
             }
+            return true;
+        }
+
+        /// <summary>
+        /// Update Universe.Objects for provided seconds
+        /// </summary>
+        public void RunObjectsSim(float totalSeconds)
+        {
+            // we run multiple iterations in order to allow the universe to properly simulate
+            for (float time = 0f; time < totalSeconds; time += TestSimStep.FixedTime)
+            {
+                Universe.Objects.Update(TestSimStep);
+                OnObjectSimStep();
+            }
+        }
+
+        public void RunObjectsSim(FixedSimTime totalTime)
+        {
+            RunObjectsSim(totalTime.FixedTime);
+        }
+
+        // Can override this function to do work between sim steps
+        protected virtual void OnObjectSimStep()
+        {
         }
     }
 }

@@ -55,7 +55,8 @@ namespace Ship_Game
         }
 
         // @return Find with index of next element
-        public static bool FindFirstValid<T>(this T[] items, int count, Predicate<T> predicate, out int nextIndex, out T firstValid)
+        public static bool FindFirstValid<T>(this T[] items, int count, Predicate<T> predicate,
+                                             out int nextIndex, out T firstValid)
         {
             int i = 0;
             for (; i < count; ++i)
@@ -73,7 +74,8 @@ namespace Ship_Game
             return false;
         }
 
-        public static bool FindFirstValid<T>(this IReadOnlyList<T> items, int count, Predicate<T> predicate, out int nextIndex, out T firstValid)
+        public static bool FindFirstValid<T>(this IReadOnlyList<T> items, int count,
+                                             Predicate<T> predicate, out int nextIndex, out T firstValid)
         {
             int i = 0;
             for (; i < count; ++i)
@@ -357,7 +359,7 @@ namespace Ship_Game
 
             var keys = new float[array.Length];
             for (int i = 0; i < array.Length; ++i)
-                keys[i] = array[i].Center.SqDist(fromPos);
+                keys[i] = array[i].Position.SqDist(fromPos);
 
             Array.Sort(keys, array, 0, array.Length);
         }

@@ -107,9 +107,9 @@ namespace Ship_Game.Ships
             if (TetheredTo != null)
             {
                 Position = TetheredTo.Center + TetherOffset;
-                Center   = TetheredTo.Center + TetherOffset;
                 VelocityMaximum = 0;
             }
+
             if (IsHangarShip && !Mothership.Active) //Problematic for drones...
                 Mothership = null;
 
@@ -127,7 +127,7 @@ namespace Ship_Game.Ships
                 for (int i = 5 - 1; i >= 0; --i)
                 {
                     Vector3 randPos = UniverseRandom.Vector32D(third);
-                    Empire.Universe.Particles.Lightning.AddParticle(Center.ToVec3() + randPos);
+                    Empire.Universe.Particles.Lightning.AddParticle(Position.ToVec3() + randPos);
                 }
             }
 
@@ -146,7 +146,7 @@ namespace Ship_Game.Ships
                 {
                     ShipSO.World = Matrix.CreateRotationY(yRotation)
                                  * Matrix.CreateRotationZ(Rotation)
-                                 * Matrix.CreateTranslation(new Vector3(Center, 0.0f));
+                                 * Matrix.CreateTranslation(new Vector3(Position, 0.0f));
                     ShipSO.UpdateAnimation(timeStep.FixedTime);
                     UpdateThrusters(timeStep);
                 }
@@ -156,7 +156,7 @@ namespace Ship_Game.Ships
                 }
             }
 
-            SoundEmitter.Position = new Vector3(Center, 0);
+            SoundEmitter.Position = new Vector3(Position, 0);
 
             ResetFrameThrustState();
         }
@@ -171,7 +171,7 @@ namespace Ship_Game.Ships
                 {
                     if (p.IsExploredBy(loyalty)) // already explored
                         continue;
-                    if (p.Center.OutsideRadius(Center, 3000f))
+                    if (p.Center.OutsideRadius(Position, 3000f))
                         continue;
 
                     if (p.EventsOnTiles())
@@ -322,136 +322,26 @@ namespace Ship_Game.Ships
                              * Matrix.CreateRotationY(yRotation)
                              * Matrix.CreateRotationX(xRotation)
                              * Matrix.CreateRotationZ(Rotation)
-                             * Matrix.CreateTranslation(new Vector3(Center, 0.0f));
+                             * Matrix.CreateTranslation(new Vector3(Position, 0.0f));
 
 
                 if (RandomMath.RollDice(10) && !IsMeteor) // Spawn some junk when tumbling
                 {
                     float radSqrt = (float)Math.Sqrt(Radius);
                     float junkScale = (radSqrt * 0.02f).UpperBound(0.2f) * scale;
-                    SpaceJunk.SpawnJunk(1, Center.GenerateRandomPointOnCircle(Radius / 20),
+                    SpaceJunk.SpawnJunk(1, Position.GenerateRandomPointOnCircle(Radius / 20),
                         Velocity * scale, this, Radius, junkScale, true);
                 }
 
                 ShipSO.UpdateAnimation(timeStep.FixedTime);
             }
 
-            SoundEmitter.Position = new Vector3(Center, 0);
+            SoundEmitter.Position = new Vector3(Position, 0);
 
             for (int i = 0; i < ModuleSlotList.Length; i++)
             {
                 ModuleSlotList[i].UpdateWhileDying(timeStep);
             }
-        }
-
-        void CheckAndPowerConduit(ShipModule module)
-        {
-            if (!module.Active)
-                return;
-            module.Powered = true;
-            module.CheckedConduits = true;
-            Vector2 center = module.LocalCenter;
-            for (int x = 0; x < ModuleSlotList.Length; x++)
-            {
-                ShipModule slot = ModuleSlotList[x];
-                if (slot == module || slot.ModuleType != ShipModuleType.PowerConduit || slot.CheckedConduits)
-                    continue;
-                var distanceX = (int) Math.Abs(center.X - slot.LocalCenter.X) ;
-                var distanceY = (int) Math.Abs(center.Y - slot.LocalCenter.Y) ;
-                if (distanceX + distanceY > 16)
-                {
-                    if (distanceX + distanceY > 33)
-                        continue;
-                    if (distanceX + distanceY < 33)
-                        continue;
-                }
-
-                CheckAndPowerConduit(slot);
-            }
-        }
-
-        public void RecalculatePower()
-        {
-            ShouldRecalculatePower = false;
-
-            for (int i = 0; i < ModuleSlotList.Length; ++i)
-            {
-                ShipModule slot      = ModuleSlotList[i];
-                slot.Powered         = false;
-                slot.CheckedConduits = false;
-            }
-
-            for (int i = 0; i < ModuleSlotList.Length; ++i)
-            {
-                ShipModule module = ModuleSlotList[i];
-                //better fix for modules that dont use power.
-                if (module.PowerRadius < 1 && (module.PowerDraw <= 0 || module.AlwaysPowered))
-                {
-                    module.Powered = true;
-                    continue;
-                }
-                //Filter by powerplants.
-                if (!module.Is(ShipModuleType.PowerPlant) || !module.Active)
-                    continue;
-
-                module.Powered = true;
-                foreach (ShipModule slot2 in ModuleSlotList)
-                {
-                    if (slot2.ModuleType != ShipModuleType.PowerConduit || slot2.Powered)
-                        continue;
-
-                    if (IsAnyPartOfModuleInRadius(module, slot2.LocalCenter, 16))
-                        CheckAndPowerConduit(slot2);
-                }
-            }
-            for (int i = 0; i < ModuleSlotList.Length; ++i)
-            {
-                ShipModule module = ModuleSlotList[i];
-                if (!module.Active || module.PowerRadius < 1 || !module.Powered )
-                    continue;
-
-                float cx = module.LocalCenter.X;
-                float cy = module.LocalCenter.Y;
-                int powerRadius = module.PowerRadius * 16 + (int)module.Radius;
-
-                foreach (ShipModule slot2 in ModuleSlotList)
-                {
-                    if (!slot2.Active || slot2.Powered  || slot2 == module || slot2.ModuleType == ShipModuleType.PowerConduit)
-                        continue;
-
-                    int distanceFromPowerX = (int)Math.Abs(cx - (slot2.Position.X + 8)) ;
-                    int distanceFromPowerY = (int)Math.Abs(cy - (slot2.Position.Y + 8));
-                    if (distanceFromPowerX + distanceFromPowerY <= powerRadius)
-                    {
-                        slot2.Powered = true;
-                        continue;
-                    }
-                    //if its really far away dont bother.
-                    if (distanceFromPowerX + distanceFromPowerY > slot2.Radius * 2 + powerRadius)
-                        continue;
-                    slot2.Powered = IsAnyPartOfModuleInRadius(slot2, new Vector2(cx, cy), powerRadius);
-                }
-            }
-        }
-        //not sure where to put this. I guess shipModule but its huge. Maybe an extension?
-        private static bool IsAnyPartOfModuleInRadius(ShipModule moduleAreaToCheck, Vector2 pos, int radius)
-        {
-            float cx = pos.X;
-            float cy = pos.Y;
-            for (int y = 0; y < moduleAreaToCheck.YSIZE; ++y)
-            {
-                float sy = moduleAreaToCheck.Position.Y + (y * 16) + 8;
-                for (int x = 0; x < moduleAreaToCheck.XSIZE; ++x)
-                {
-                    if (y == moduleAreaToCheck.YSIZE * 16 && x == moduleAreaToCheck.XSIZE *16)
-                        continue;
-
-                    float sx = moduleAreaToCheck.Position.X + (x * 16) + 8;
-                    if ((int) Math.Abs(cx - sx) + (int) Math.Abs(cy - sy) <= radius + 8)
-                        return true;
-                }
-            }
-            return false;
         }
     }
 }

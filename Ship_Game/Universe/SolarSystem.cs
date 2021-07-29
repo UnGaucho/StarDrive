@@ -218,7 +218,7 @@ namespace Ship_Game
 
         bool ShipWithinRadiationRadius(Ship ship, out float distance)
         {
-            distance = ship.Center.Distance(Position);
+            distance = ship.Position.Distance(Position);
             return distance < Sun.RadiationRadius;
         }
         
@@ -235,7 +235,7 @@ namespace Ship_Game
         // overload for ship info UI or AI maybe
         public bool ShipWithinRadiationRadius(Ship ship)
         {
-            float distance = ship.Center.Distance(Position);
+            float distance = ship.Position.Distance(Position);
             return distance < Sun.RadiationRadius;
         }
 
@@ -756,6 +756,7 @@ namespace Ship_Game
                     AverageProdImportTurns    = planet.AverageProdImportTurns,
                     AverageFoodExportTurns    = planet.AverageFoodExportTurns,
                     AverageProdExportTurns    = planet.AverageProdExportTurns,
+                    IsHomeworld               = planet.IsHomeworld
                 };
 
                 if (planet.Owner != null)

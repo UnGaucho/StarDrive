@@ -33,14 +33,12 @@ namespace Ship_Game.Ships
             
             // loyalty must be set before modules are initialized
             LoyaltyTracker = new Components.LoyaltyChanges(this, empire);
-            // loyalty tracker can not add to the empire ships here yet as this is done during resource loading.
-            // currently this is done during create entities for save load and
 
             if (!CreateModuleSlotsFromData(data.ModuleSlots, fromSave, isTemplate, shipyardDesign))
                 return;
 
-            // Ships unable to create the moduleslots cant be safely added to empire shiplists. 
-            if (!isTemplate && !shipyardDesign)
+            // ship must not be added to empire ship list until after modules are validated.
+            if (!isTemplate && !shipyardDesign) // don't trigger adding to empire lists for template designs
                 LoyaltyChangeAtSpawn(empire);
 
             Stats = new ShipStats(this);
@@ -374,8 +372,6 @@ namespace Ship_Game.Ships
         // Before this call, the ship doesn't have an AI instance
         public void InitializeShip(bool loadingFromSaveGame = false)
         {
-            Center = Position;
-
             if (VanityName.IsEmpty())
                 VanityName = Name;
 
@@ -497,7 +493,6 @@ namespace Ship_Game.Ships
             MaxBank = GetMaxBank();
             if (!fromSave)
                 KillAllTroops();
-
             InitDefendingTroopStrength();
 
             if (!fromSave)
@@ -522,7 +517,7 @@ namespace Ship_Game.Ships
                         shipData.Role = ShipData.RoleName.construction;
                         break;
                     case ShipModuleType.PowerConduit:
-                        module.IconTexturePath = GetConduitGraphic(module);
+                        module.IconTexturePath = PwrGrid.GetConduitGraphic(module);
                         break;
                     case ShipModuleType.Colony:
                         isColonyShip = true;
@@ -548,6 +543,9 @@ namespace Ship_Game.Ships
 
                 if (module.Regenerate > 0)
                     HasRegeneratingModules = true;
+
+                if (module.UID == "MeteorPart")
+                    IsMeteor = true;
             }
             HealthMax = Health;
         }

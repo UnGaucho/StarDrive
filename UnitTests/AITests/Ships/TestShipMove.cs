@@ -13,14 +13,12 @@ namespace UnitTests.AITests.Ships
     {
         public TestShipMove()
         {
-            CreateGameInstance();
-            LoadStarterShipVulcan();
             CreateUniverseAndPlayerEmpire();
         }
 
         void WaitForEngineChangeTo(Ship.MoveState state, Ship ship, Action update)
         {
-            LoopWhile(5, () => ship.engineState != state, update);
+            LoopWhile((timeout:5, fatal:true), () => ship.engineState != state, update);
         }
 
         [TestMethod]
@@ -52,7 +50,7 @@ namespace UnitTests.AITests.Ships
             });
             Assert.IsTrue(sawEnemyShip, "Did not see an enemy while at warp");
             Assert.IsTrue(ship.AI.BadGuysNear, "Bad guys near was not set");
-            Assert.IsTrue(ship.Center.InRadius(movePosition, 6000), "final move failed");
+            Assert.IsTrue(ship.Position.InRadius(movePosition, 6000), "final move failed");
         }
         
 
@@ -61,7 +59,7 @@ namespace UnitTests.AITests.Ships
         {
             Ship ship  = SpawnShip("Vulcan Scout", Player, Vector2.Zero);
             Ship enemy  = SpawnShip("Vulcan Scout", Enemy, new Vector2(30000, 0));
-            enemy.AI.OrderHoldPosition(enemy.Center, new Vector2(0,1));
+            enemy.AI.OrderHoldPosition(enemy.Position, new Vector2(0,1));
 
             // order ship to move, CombatMove
             var movePosition = new Vector2(60000, 0);
@@ -86,7 +84,7 @@ namespace UnitTests.AITests.Ships
 
             Assert.IsTrue(sawEnemyShip, "Did not see an enemy while at warp");
             Assert.IsTrue(ship.AI.BadGuysNear, "Bad guys near was not set");
-            Assert.IsTrue(ship.Center.InRadius(enemy.Center, 7500), $"CombatMove failed: {ship} not at {enemy}");
+            Assert.IsTrue(ship.Position.InRadius(enemy.Position, 7500), $"CombatMove failed: {ship} not at {enemy}");
         }
     }
 }

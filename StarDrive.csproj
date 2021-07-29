@@ -289,7 +289,10 @@
     <Compile Include="Ship_Game\Ships\IShipPool.cs" />
     <Compile Include="Ship_Game\Ships\ShipDataWriter.cs" />
     <Compile Include="Ship_Game\Ships\ShipHull.cs" />
+    <Compile Include="Ship_Game\Ships\Ship_Events.cs" />
+    <Compile Include="Ship_Game\Ships\Ship_PowerCalc.cs" />
     <Compile Include="Ship_Game\Universe\UniverseScreen\UniverseScreen.Save.cs" />
+    <Compile Include="Ship_Game\Utils\BitArray.cs" />
     <Compile Include="Ship_Game\Utils\ChangePendingList.cs" />
     <Compile Include="Ship_Game\Utils\DetachedList.cs" />
     <Compile Include="Ship_Game\Data\InterningStringConverter.cs" />
@@ -1702,7 +1705,8 @@
 powershell -ExecutionPolicy Bypass -File $(SolutionDir)CopyGameContent.ps1  $(SolutionDir)  $(SolutionDir)StarDrive\  COPYMODS
 
 if "$(ConfigurationName)" == "Deploy"  (
-  $(SolutionDir)Deploy\MakeInstaller.cmd $(SolutionDir)
+  :: run the installer generator script with Python 3
+  py -3 $(SolutionDir)Deploy\MakeInstaller.py $(SolutionDir)
 )
 </PostBuildEvent>
   </PropertyGroup>

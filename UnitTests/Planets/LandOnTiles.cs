@@ -1,5 +1,4 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
-using Microsoft.Xna.Framework;
 using Ship_Game;
 
 namespace UnitTests.Planets
@@ -14,9 +13,6 @@ namespace UnitTests.Planets
 
         public TestLandOnTile()
         {
-            CreateGameInstance();
-            LoadPlanetContent();
-            ResourceManager.LoadProjectileMeshes();
             CreateUniverseAndPlayerEmpire();
             Universe.NotificationManager = new NotificationManager(Universe.ScreenManager, Universe);
             AddDummyPlanetToEmpire(Player);
